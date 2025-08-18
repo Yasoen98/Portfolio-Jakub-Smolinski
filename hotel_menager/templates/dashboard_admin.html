@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel - Zarządzanie Pokojami</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            max-width: 800px;
+            width: 100%;
+        }
+        h1, h2, h3 {
+            color: #333;
+        }
+        a {
+            color: #4CAF50;
+            text-decoration: none;
+        }
+        .main-container {
+            display: flex;
+            flex-direction: row;
+        }
+        .sidebar {
+            width: 200px;
+            padding: 10px;
+            border-right: 1px solid #ddd;
+        }
+        .sidebar button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+        .sidebar button:hover {
+            background-color: #45a049;
+        }
+        .content {
+            flex: 1;
+            padding: 10px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .status-icon {
+            cursor: pointer;
+            font-size: 20px;
+        }
+        .status-free {
+            background-color: green;
+            color: white;
+        }
+        .status-occupied {
+            background-color: red;
+            color: white;
+        }
+        #manageSection {
+            display: none;
+            margin-top: 20px;
+        }
+        form {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        input, select {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button[type="submit"] {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button[type="submit"]:hover {
+            background-color: #45a049;
+        }
+        @media (max-width: 768px) {
+            .main-container {
+                flex-direction: column;
+            }
+            .sidebar {
+                width: 100%;
+                border-right: none;
+                border-bottom: 1px solid #ddd;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        
+        <div class="main-container">
+            <div class="sidebar">
+                <h3>Menu</h3>
+                <button id="toggleButton" onclick="toggleView()">Zarządzaj</button>
+                <a href="/logout" class="button">WYLOGUJ</a>
+            </div>
+            
+            <div class="content">
+                <div id="roomsList">
+                    <h2>Lista Pokoi</h2>
+                    <table id="roomsTable">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Numer</th>
+                                <th>Typ</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                
+                <div id="manageSection" style="display: none;">
+                    <h2>Dodaj Nowy Pokój</h2>
+                    <form id="addRoomForm">
+                        <label for="number">Numer pokoju:</label>
+                        <input type="text" id="number" required>
+                        
+                        <label for="type">Typ:</label>
+                        <select id="type" required>
+                            <option value="single">Single</option>
+                            <option value="double">Double</option>
+                        </select>
+                        
+                        <button type="submit">Dodaj</button>
+                    </form>
+                    
+                    <h2>Usuń Pokój</h2>
+                    <form id="deleteRoomForm">
+                        <label for="deleteSelect">Wybierz pokój do usunięcia:</label>
+                        <select id="deleteSelect" required>
+                            <option value="">-- Wybierz --</option>
+                        </select>
+                        <button type="submit">Usuń</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let isManageMode = false;
+
+        function toggleView() {
+            const roomsList = document.getElementById('roomsList');
+            const manageSection = document.getElementById('manageSection');
+            const toggleButton = document.getElementById('toggleButton');
+            
+            if (isManageMode) {
+                // Przełącz na widok listy
+                roomsList.style.display = 'block';
+                manageSection.style.display = 'none';
+                toggleButton.textContent = 'Zarządzaj';
+                isManageMode = false;
+                loadRooms();  // Odśwież listę po powrocie
+            } else {
+                // Przełącz na widok zarządzania
+                roomsList.style.display = 'none';
+                manageSection.style.display = 'block';
+                toggleButton.textContent = 'Lista';
+                isManageMode = true;
+                loadDeleteOptions();  // Załaduj opcje do selecta
+            }
+        }
+
+        async function loadRooms() {
+            const response = await fetch('/api/rooms');
+            const rooms = await response.json();
+            const tbody = document.querySelector('#roomsTable tbody');
+            tbody.innerHTML = '';
+            rooms.forEach(room => {
+                const tr = document.createElement('tr');
+                const newStatus = room.status === 'free' ? 'occupied' : 'free';
+                const icon = room.status === 'free' ? '🔓' : '🔒';
+                const statusClass = room.status === 'free' ? 'status-free' : 'status-occupied';
+                tr.innerHTML = `
+                    <td>${room.id}</td>
+                    <td>${room.number}</td>
+                    <td>${room.type}</td>
+                    <td class="${statusClass}"><span class="status-icon" onclick="changeStatus(${room.id}, '${newStatus}')">${icon}</span></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function loadDeleteOptions() {
+            const response = await fetch('/api/rooms');
+            const rooms = await response.json();
+            const select = document.getElementById('deleteSelect');
+            select.innerHTML = '<option value="">-- Wybierz --</option>';  // Reset opcji
+            rooms.forEach(room => {
+                const option = document.createElement('option');
+                option.value = room.id;
+                option.textContent = `${room.number} - ${room.type}`;
+                select.appendChild(option);
+            });
+        }
+
+        async function changeStatus(roomId, status) {
+            await fetch(`/api/room/${roomId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status })
+            });
+            loadRooms();
+        }
+
+        document.getElementById('addRoomForm').addEventListener('submit', async function(event) {
+            event.preventDefault();
+            const number = document.getElementById('number').value;
+            const type = document.getElementById('type').value;
+            
+            const response = await fetch('/api/rooms', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ number, type })
+            });
+            
+            if (response.ok) {
+                alert('Pokój dodany!');
+                document.getElementById('addRoomForm').reset();
+                // Odśwież opcje usuwania po dodaniu
+                loadDeleteOptions();
+            } else {
+                alert('Błąd podczas dodawania pokoju.');
+            }
+        });
+
+        document.getElementById('deleteRoomForm').addEventListener('submit', async function(event) {
+            event.preventDefault();
+            const deleteId = document.getElementById('deleteSelect').value;
+            if (!deleteId) {
+                alert('Wybierz pokój do usunięcia.');
+                return;
+            }
+            
+            const response = await fetch(`/api/room/${deleteId}`, {
+                method: 'DELETE'
+            });
+            
+            if (response.ok) {
+                alert('Pokój usunięty!');
+                // Odśwież opcje po usunięciu
+                loadDeleteOptions();
+            } else {
+                alert('Błąd podczas usuwania pokoju.');
+            }
+        });
+
+        loadRooms();
+    </script>
+</body>
+</html>
