@@ -1,0 +1,2 @@
+# Portfolio Jakub Smolinski
+ 
