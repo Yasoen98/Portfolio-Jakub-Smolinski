@@ -35,7 +35,7 @@ Interesuje mnie środowisko startupowe oraz praca przy nowoczesnych technologiac
 
 # 📞 Kontakt  
 - 📧 E-mail: smolamk@gmail.com 
-- 🌍 GitHub: https://github.com/
+- 🌍 GitHub: https://github.com/Yasoen98/Portfolio-Jakub-Smolinski
 - 💼 LinkedIn: https://www.linkedin.com/in/jakub-smoli%C5%84ski-483533295/
 
  
