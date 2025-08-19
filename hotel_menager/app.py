@@ -1,4 +1,4 @@
-# Zaktualizowany app.py - Dodajemy API do dodawania i usuwania pokoi
+# Zaktualizowany app.py - Pozwalamy użytkownikom na aktualizację cleanliness (z dirty na clean)
 
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for
 from flask_cors import CORS
@@ -31,13 +31,14 @@ def init_db():
     cursor.execute("INSERT OR IGNORE INTO users (username, password, role) VALUES ('admin', 'haslo123', 'admin')")
     cursor.execute("INSERT OR IGNORE INTO users (username, password, role) VALUES ('user', 'haslo123', 'user')")
     
-    # Tabela rooms (bez domyślnych INSERT – dodawaj ręcznie)
+    # Tabela rooms (z nową kolumną cleanliness)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS rooms (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             number TEXT NOT NULL,
             type TEXT NOT NULL,
-            status TEXT NOT NULL DEFAULT 'free'
+            status TEXT NOT NULL DEFAULT 'free',
+            cleanliness TEXT NOT NULL DEFAULT 'clean'  -- 'clean' lub 'dirty'
         )
     ''')
     
@@ -101,10 +102,10 @@ def dashboard():
     else:
         return render_template('dashboard_user.html')
 
-# API do pobierania pokoi (dla admina)
+# API do pobierania pokoi (dla admina i użytkowników - wszyscy mogą czytać)
 @app.route('/api/rooms', methods=['GET'])
 def get_rooms():
-    if 'user_id' not in session or session.get('role') != 'admin':
+    if 'user_id' not in session:
         return jsonify({'error': 'Unauthorized'}), 401
     
     conn = sqlite3.connect(DB_NAME)
@@ -112,9 +113,9 @@ def get_rooms():
     cursor.execute("SELECT * FROM rooms")
     rooms = cursor.fetchall()
     conn.close()
-    return jsonify([{'id': r[0], 'number': r[1], 'type': r[2], 'status': r[3]} for r in rooms])
+    return jsonify([{'id': r[0], 'number': r[1], 'type': r[2], 'status': r[3], 'cleanliness': r[4]} for r in rooms])
 
-# API do dodawania pokoju
+# API do dodawania pokoju (tylko admin)
 @app.route('/api/rooms', methods=['POST'])
 def add_room():
     if 'user_id' not in session or session.get('role') != 'admin':
@@ -129,12 +130,12 @@ def add_room():
     
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO rooms (number, type, status) VALUES (?, ?, 'free')", (number, room_type))
+    cursor.execute("INSERT INTO rooms (number, type, status, cleanliness) VALUES (?, ?, 'free', 'clean')", (number, room_type))
     conn.commit()
     conn.close()
     return jsonify({'success': True})
 
-# API do usuwania pokoju
+# API do usuwania pokoju (tylko admin)
 @app.route('/api/room/<int:room_id>', methods=['DELETE'])
 def delete_room(room_id):
     if 'user_id' not in session or session.get('role') != 'admin':
@@ -147,7 +148,7 @@ def delete_room(room_id):
     conn.close()
     return jsonify({'success': True})
 
-# API do aktualizacji statusu pokoju
+# API do aktualizacji statusu pokoju (zajętość, tylko admin)
 @app.route('/api/room/<int:room_id>', methods=['PUT'])
 def update_room(room_id):
     if 'user_id' not in session or session.get('role') != 'admin':
@@ -159,6 +160,22 @@ def update_room(room_id):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute("UPDATE rooms SET status = ? WHERE id = ?", (status, room_id))
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True})
+
+# API do aktualizacji cleanliness (dla wszystkich zalogowanych użytkowników)
+@app.route('/api/room/<int:room_id>/cleanliness', methods=['PUT'])
+def update_cleanliness(room_id):
+    if 'user_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    data = request.json
+    cleanliness = data.get('cleanliness')
+    
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("UPDATE rooms SET cleanliness = ? WHERE id = ?", (cleanliness, room_id))
     conn.commit()
     conn.close()
     return jsonify({'success': True})

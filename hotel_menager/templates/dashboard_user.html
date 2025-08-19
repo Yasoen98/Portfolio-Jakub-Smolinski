@@ -3,53 +3,87 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panel Użytkownika - Moje Rezerwacje</title>
+    <title>Panel - Zarządzanie Pokojami</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <style>
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background-color: #f2f2f2; }
-    </style>
 </head>
 <body>
     <div class="container">
-        <h1>Panel Użytkownika</h1>
-        <p>Witaj! Sprawdź swoje rezerwacje poniżej.</p>
-        <a href="/logout">Wyloguj się</a>
         
-        <h2>Moje Rezerwacje</h2>
-        <table id="reservationsTable">
-            <thead>
-                <tr>
-                    <th>Numer Pokoju</th>
-                    <th>Typ</th>
-                    <th>Check-in</th>
-                    <th>Check-out</th>
-                </tr>
-            </thead>
-            <tbody></tbody>
-        </table>
+        <div class="main-container">
+            <div class="sidebar">
+                <h3>Menu</h3>
+                <a href="/logout" class="button">WYLOGUJ</a>
+            </div>
+            
+            <div class="content">
+                <div id="roomsList">
+                    <h2>Lista Pokoi do Sprzątania</h2>
+                    <table id="roomsTable">
+                        <thead>
+                            <tr>
+                                <th>Numer</th>
+                                <th>Typ</th>
+                                <th>Stan</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
-        async function loadReservations() {
-            const response = await fetch('/api/reservations');
-            const reservations = await response.json();
-            const tbody = document.querySelector('#reservationsTable tbody');
+        async function loadRooms() {
+            const response = await fetch('/api/rooms');
+            const rooms = await response.json();
+            const tbody = document.querySelector('#roomsTable tbody');
             tbody.innerHTML = '';
-            reservations.forEach(res => {
+            const filteredRooms = rooms.filter(room => room.status === 'occupied' || room.cleanliness === 'dirty');
+            filteredRooms.forEach(room => {
+                let state;
+                if (room.status === 'occupied') {
+                    state = 'occupied';
+                } else {
+                    state = room.cleanliness;
+                }
+                const rowClass = `row-${state}`;
                 const tr = document.createElement('tr');
+                tr.className = rowClass;
+                let selectHtml = '';
+                if (room.status !== 'occupied' && room.cleanliness === 'dirty') {
+                    selectHtml = `
+                        <select onchange="changeState(${room.id}, this.value)">
+                            <option value="dirty" selected>Dirty</option>
+                            <option value="clean">Clean</option>
+                        </select>
+                    `;
+                } else if (room.status === 'occupied') {
+                    selectHtml = 'Occupied';
+                } else {
+                    selectHtml = state.charAt(0).toUpperCase() + state.slice(1);  // Dla clean, jeśli jakimś cudem
+                }
                 tr.innerHTML = `
-                    <td>${res.room_number}</td>
-                    <td>${res.type}</td>
-                    <td>${res.check_in}</td>
-                    <td>${res.check_out}</td>
+                    <td>${room.number}</td>
+                    <td>${room.type}</td>
+                    <td>${selectHtml}</td>
                 `;
                 tbody.appendChild(tr);
             });
         }
 
-        loadReservations();
+        async function changeState(roomId, value) {
+            if (value === 'clean') {
+                await fetch(`/api/room/${roomId}/cleanliness`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ cleanliness: 'clean' })
+                });
+            }
+            loadRooms();
+        }
+
+        loadRooms();
     </script>
 </body>
 </html>

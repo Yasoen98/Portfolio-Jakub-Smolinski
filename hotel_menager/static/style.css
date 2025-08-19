@@ -1,55 +1,135 @@
-              body {
-            font-family: Arial, sans-serif;
-            background-color: #0e0707;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-        }
-        .container {
-            background-color: #dfdada;
-            padding: 40px;
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 2);
-            text-align: center;
-            max-width: 400px;
-            width: 100%;
-        }
-        h1 {
-            color: #333;
-            margin-bottom: 20px;
-        }
-        form {
-            display: flex;
-            flex-direction: column;
-        }
-        label {
-            text-align: left;
-            margin-bottom: 5px;
-            color: #555;
-        }
-        input[type="text"], input[type="password"] {
-            padding: 10px;
-            margin-bottom: 15px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 16px;
-        }
-        button {
-            background-color: #4CAF50;
-            color: white;
-            padding: 10px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        button:hover {
-            background-color: #45a049;
-        }
-        .error {
-            color: red;
-            margin-top: 10px;
-        }
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f4f4f4;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+.container {
+    background-color: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    max-width: 800px;
+    width: 100%;
+}
+h1, h2, h3 {
+    color: #333;
+    text-align: center;
+}
+a {
+    color: #4CAF50;
+    text-decoration: none;
+}
+.main-container {
+    display: flex;
+    flex-direction: row;
+    min-height: 400px; /* Dodano min-height, aby sidebar mógł się rozciągnąć */
+}
+.sidebar {
+    width: 200px;
+    padding: 10px;
+    border-right: 1px solid #ddd;
+    display: flex; /* Flex dla kolumny */
+    flex-direction: column; /* Kolumna */
+}
+.sidebar button {
+    background-color: #4CAF50;
+    color: white;
+    padding: 10px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    width: 100%;
+    margin-bottom: 10px;
+}
+.sidebar button:hover {
+    background-color: #45a049;
+}
+.content {
+    flex: 1;
+    padding: 10px;
+}
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+th, td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: center;
+}
+th {
+    background-color: #f2f2f2;
+}
+#manageSection {
+    display: none;
+    margin-top: 20px;
+}
+form {
+    margin-bottom: 20px;
+}
+label {
+    display: block;
+    margin-bottom: 5px;
+}
+input, select {
+    width: 100%;
+    padding: 8px;
+    margin-bottom: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+button[type="submit"] {
+    background-color: #4CAF50;
+    color: white;
+    padding: 10px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+button[type="submit"]:hover {
+    background-color: #45a049;
+}
+.row-clean {
+    background-color: green;
+    color: white;
+}
+.row-dirty {
+    background-color: red;
+    color: white;
+}
+.row-occupied {
+    background-color: purple;
+    color: white;
+}
+@media (max-width: 768px) {
+    .main-container {
+        flex-direction: column;
+    }
+    .sidebar {
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid #ddd;
+    }
+}
+.button {
+    display: block;
+    /*#background-color: #f44336; /* Czerwony kolor dla wylogowania, aby był bardziej wyróżniony */
+    color: #f44336;
+    padding: 5px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    width: 100%;
+    text-align: center;
+    margin-top: auto; /* Pcha przycisk na dół sidebar */
+    font-weight: bold; /* Grubsza czcionka dla estetyki */
+}
+.button:hover {
+    background-color: #d32f2f; /* Ciemniejszy czerwony na hover */
+}
