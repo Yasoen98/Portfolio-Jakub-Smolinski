@@ -70,18 +70,6 @@
         th {
             background-color: #f2f2f2;
         }
-        .status-icon {
-            cursor: pointer;
-            font-size: 20px;
-        }
-        .status-free {
-            background-color: green;
-            color: white;
-        }
-        .status-occupied {
-            background-color: red;
-            color: white;
-        }
         #manageSection {
             display: none;
             margin-top: 20px;
@@ -110,6 +98,18 @@
         }
         button[type="submit"]:hover {
             background-color: #45a049;
+        }
+        .row-clean {
+            background-color: green;
+            color: white;
+        }
+        .row-dirty {
+            background-color: red;
+            color: white;
+        }
+        .row-occupied {
+            background-color: purple;
+            color: white;
         }
         @media (max-width: 768px) {
             .main-container {
@@ -142,7 +142,7 @@
                                 <th>ID</th>
                                 <th>Numer</th>
                                 <th>Typ</th>
-                                <th>Status</th>
+                                <th>Stan</th>
                             </tr>
                         </thead>
                         <tbody></tbody>
@@ -208,15 +208,28 @@
             const tbody = document.querySelector('#roomsTable tbody');
             tbody.innerHTML = '';
             rooms.forEach(room => {
+                let state;
+                if (room.status === 'occupied') {
+                    state = 'occupied';
+                } else if (room.cleanliness === 'clean') {
+                    state = 'clean';
+                } else {
+                    state = 'dirty';
+                }
+                const rowClass = `row-${state}`;
                 const tr = document.createElement('tr');
-                const newStatus = room.status === 'free' ? 'occupied' : 'free';
-                const icon = room.status === 'free' ? '🔓' : '🔒';
-                const statusClass = room.status === 'free' ? 'status-free' : 'status-occupied';
+                tr.className = rowClass;
                 tr.innerHTML = `
                     <td>${room.id}</td>
                     <td>${room.number}</td>
                     <td>${room.type}</td>
-                    <td class="${statusClass}"><span class="status-icon" onclick="changeStatus(${room.id}, '${newStatus}')">${icon}</span></td>
+                    <td>
+                        <select onchange="changeState(${room.id}, this.value)">
+                            <option value="clean" ${state === 'clean' ? 'selected' : ''}>Clean</option>
+                            <option value="dirty" ${state === 'dirty' ? 'selected' : ''}>Dirty</option>
+                            <option value="occupied" ${state === 'occupied' ? 'selected' : ''}>Occupied</option>
+                        </select>
+                    </td>
                 `;
                 tbody.appendChild(tr);
             });
@@ -235,12 +248,25 @@
             });
         }
 
-        async function changeStatus(roomId, status) {
-            await fetch(`/api/room/${roomId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status })
-            });
+        async function changeState(roomId, value) {
+            if (value === 'occupied') {
+                await fetch(`/api/room/${roomId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: 'occupied' })
+                });
+            } else {
+                await fetch(`/api/room/${roomId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: 'free' })
+                });
+                await fetch(`/api/room/${roomId}/cleanliness`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ cleanliness: value })
+                });
+            }
             loadRooms();
         }
 
