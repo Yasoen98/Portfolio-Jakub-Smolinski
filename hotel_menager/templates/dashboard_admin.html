@@ -5,123 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Panel - Zarządzanie Pokojami</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-        }
-        .container {
-            background-color: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-            max-width: 800px;
-            width: 100%;
-        }
-        h1, h2, h3 {
-            color: #333;
-        }
-        a {
-            color: #4CAF50;
-            text-decoration: none;
-        }
-        .main-container {
-            display: flex;
-            flex-direction: row;
-        }
-        .sidebar {
-            width: 200px;
-            padding: 10px;
-            border-right: 1px solid #ddd;
-        }
-        .sidebar button {
-            background-color: #4CAF50;
-            color: white;
-            padding: 10px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            width: 100%;
-            margin-bottom: 10px;
-        }
-        .sidebar button:hover {
-            background-color: #45a049;
-        }
-        .content {
-            flex: 1;
-            padding: 10px;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-        th, td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: center;
-        }
-        th {
-            background-color: #f2f2f2;
-        }
-        #manageSection {
-            display: none;
-            margin-top: 20px;
-        }
-        form {
-            margin-bottom: 20px;
-        }
-        label {
-            display: block;
-            margin-bottom: 5px;
-        }
-        input, select {
-            width: 100%;
-            padding: 8px;
-            margin-bottom: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-        button[type="submit"] {
-            background-color: #4CAF50;
-            color: white;
-            padding: 10px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        button[type="submit"]:hover {
-            background-color: #45a049;
-        }
-        .row-clean {
-            background-color: green;
-            color: white;
-        }
-        .row-dirty {
-            background-color: red;
-            color: white;
-        }
-        .row-occupied {
-            background-color: purple;
-            color: white;
-        }
-        @media (max-width: 768px) {
-            .main-container {
-                flex-direction: column;
-            }
-            .sidebar {
-                width: 100%;
-                border-right: none;
-                border-bottom: 1px solid #ddd;
-            }
-        }
-    </style>
 </head>
 <body>
     <div class="container">
@@ -129,12 +12,14 @@
         <div class="main-container">
             <div class="sidebar">
                 <h3>Menu</h3>
-                <button id="toggleButton" onclick="toggleView()">Zarządzaj</button>
+                <button id="listButton" class="active" onclick="showView('rooms')">Lista</button>
+                <button id="manageButton" onclick="showView('manage')">Zarządzaj</button>
+                <button id="logsButton" onclick="showView('logs')">Logs</button>
                 <a href="/logout" class="button">WYLOGUJ</a>
             </div>
             
             <div class="content">
-                <div id="roomsList">
+                <div id="roomsList" style="display: block;">
                     <h2>Lista Pokoi</h2>
                     <table id="roomsTable">
                         <thead>
@@ -173,32 +58,58 @@
                         <button type="submit">Usuń</button>
                     </form>
                 </div>
+
+                <div id="logsSection" style="display: none;">
+                    <h2>Logi Zmian Statusu</h2>
+                    <table id="logsTable">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Godzina</th>
+                                <th>Numer Pokoju</th>
+                                <th>Użytkownik</th>
+                                <th>Poprzedni Status</th>
+                                <th>Nowy Status</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
-        let isManageMode = false;
-
-        function toggleView() {
+        function showView(view) {
             const roomsList = document.getElementById('roomsList');
             const manageSection = document.getElementById('manageSection');
-            const toggleButton = document.getElementById('toggleButton');
+            const logsSection = document.getElementById('logsSection');
+            const listButton = document.getElementById('listButton');
+            const manageButton = document.getElementById('manageButton');
+            const logsButton = document.getElementById('logsButton');
             
-            if (isManageMode) {
-                // Przełącz na widok listy
+            // Ukryj wszystkie sekcje
+            roomsList.style.display = 'none';
+            manageSection.style.display = 'none';
+            logsSection.style.display = 'none';
+
+            // Usuń klasę active ze wszystkich buttonów
+            listButton.classList.remove('active');
+            manageButton.classList.remove('active');
+            logsButton.classList.remove('active');
+
+            if (view === 'rooms') {
                 roomsList.style.display = 'block';
-                manageSection.style.display = 'none';
-                toggleButton.textContent = 'Zarządzaj';
-                isManageMode = false;
-                loadRooms();  // Odśwież listę po powrocie
-            } else {
-                // Przełącz na widok zarządzania
-                roomsList.style.display = 'none';
+                listButton.classList.add('active');
+                loadRooms();
+            } else if (view === 'manage') {
                 manageSection.style.display = 'block';
-                toggleButton.textContent = 'Lista';
-                isManageMode = true;
-                loadDeleteOptions();  // Załaduj opcje do selecta
+                manageButton.classList.add('active');
+                loadDeleteOptions();
+            } else if (view === 'logs') {
+                logsSection.style.display = 'block';
+                logsButton.classList.add('active');
+                loadLogs();
             }
         }
 
@@ -248,6 +159,25 @@
             });
         }
 
+        async function loadLogs() {
+            const response = await fetch('/api/logs');
+            const logs = await response.json();
+            const tbody = document.querySelector('#logsTable tbody');
+            tbody.innerHTML = '';
+            logs.forEach(log => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${log.date}</td>
+                    <td>${log.time}</td>
+                    <td>${log.room_number}</td>
+                    <td>${log.username}</td>
+                    <td>${log.previous}</td>
+                    <td>${log.new}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
         async function changeState(roomId, value) {
             if (value === 'occupied') {
                 await fetch(`/api/room/${roomId}`, {
@@ -284,7 +214,6 @@
             if (response.ok) {
                 alert('Pokój dodany!');
                 document.getElementById('addRoomForm').reset();
-                // Odśwież opcje usuwania po dodaniu
                 loadDeleteOptions();
             } else {
                 alert('Błąd podczas dodawania pokoju.');
@@ -305,7 +234,6 @@
             
             if (response.ok) {
                 alert('Pokój usunięty!');
-                // Odśwież opcje po usunięciu
                 loadDeleteOptions();
             } else {
                 alert('Błąd podczas usuwania pokoju.');
