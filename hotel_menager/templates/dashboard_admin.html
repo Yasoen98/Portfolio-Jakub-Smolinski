@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
+    <body data-user-id="{{ current_user_id }}"></body>
     <div class="container">
         
         <div class="main-container">
@@ -14,6 +15,7 @@
                 <h3>Menu</h3>
                 <button id="listButton" class="active" onclick="showView('rooms')">Lista</button>
                 <button id="manageButton" onclick="showView('manage')">Zarządzaj</button>
+                <button id="usersButton" onclick="showView('users')">Użytkownicy</button>
                 <button id="logsButton" onclick="showView('logs')">Logs</button>
                 <a href="/logout" class="button">WYLOGUJ</a>
             </div>
@@ -59,6 +61,38 @@
                     </form>
                 </div>
 
+                <div id="usersSection" style="display: none;">
+                    <h2>Lista Użytkowników</h2>
+                    <table id="usersTable">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Username</th>
+                                <th>Role</th>
+                                <th>Akcje</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+
+                    <h2>Dodaj Nowego Użytkownika</h2>
+                    <form id="addUserForm">
+                        <label for="newUsername">Nazwa użytkownika:</label>
+                        <input type="text" id="newUsername" required>
+                        
+                        <label for="newPassword">Hasło:</label>
+                        <input type="password" id="newPassword" required>
+                        
+                        <label for="newRole">Uprawnienia:</label>
+                        <select id="newRole" required>
+                            <option value="user">User</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                        
+                        <button type="submit">Dodaj</button>
+                    </form>
+                </div>
+
                 <div id="logsSection" style="display: none;">
                     <h2>Logi Zmian Statusu</h2>
                     <table id="logsTable">
@@ -79,23 +113,32 @@
         </div>
     </div>
 
+    <!-- Przekazanie ID aktualnego użytkownika do JS -->
+<script>
+    const currentUserId = parseInt(document.body.dataset.userId);
+</script>
+
     <script>
         function showView(view) {
             const roomsList = document.getElementById('roomsList');
             const manageSection = document.getElementById('manageSection');
+            const usersSection = document.getElementById('usersSection');
             const logsSection = document.getElementById('logsSection');
             const listButton = document.getElementById('listButton');
             const manageButton = document.getElementById('manageButton');
+            const usersButton = document.getElementById('usersButton');
             const logsButton = document.getElementById('logsButton');
             
             // Ukryj wszystkie sekcje
             roomsList.style.display = 'none';
             manageSection.style.display = 'none';
+            usersSection.style.display = 'none';
             logsSection.style.display = 'none';
 
             // Usuń klasę active ze wszystkich buttonów
             listButton.classList.remove('active');
             manageButton.classList.remove('active');
+            usersButton.classList.remove('active');
             logsButton.classList.remove('active');
 
             if (view === 'rooms') {
@@ -106,6 +149,10 @@
                 manageSection.style.display = 'block';
                 manageButton.classList.add('active');
                 loadDeleteOptions();
+            } else if (view === 'users') {
+                usersSection.style.display = 'block';
+                usersButton.classList.add('active');
+                loadUsers();
             } else if (view === 'logs') {
                 logsSection.style.display = 'block';
                 logsButton.classList.add('active');
@@ -156,6 +203,27 @@
                 option.value = room.id;
                 option.textContent = `${room.number} - ${room.type}`;
                 select.appendChild(option);
+            });
+        }
+
+        async function loadUsers() {
+            const response = await fetch('/api/users');
+            const users = await response.json();
+            const tbody = document.querySelector('#usersTable tbody');
+            tbody.innerHTML = '';
+            users.forEach(user => {
+                const tr = document.createElement('tr');
+                const isCurrentUser = user.id === currentUserId;
+                tr.innerHTML = `
+                    <td>${user.id}</td>
+                    <td>${user.username}</td>
+                    <td>${user.role}</td>
+                    <td>
+                        <button onclick="changePassword(${user.id})" class="action-btn">/</button>
+                        ${isCurrentUser ? '' : `<button onclick="deleteUser(${user.id})" class="action-btn">x</button>`}
+                    </td>
+                `;
+                tbody.appendChild(tr);
             });
         }
 
@@ -239,6 +307,57 @@
                 alert('Błąd podczas usuwania pokoju.');
             }
         });
+
+        document.getElementById('addUserForm').addEventListener('submit', async function(event) {
+            event.preventDefault();
+            const username = document.getElementById('newUsername').value;
+            const password = document.getElementById('newPassword').value;
+            const role = document.getElementById('newRole').value;
+            
+            const response = await fetch('/api/users', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password, role })
+            });
+            
+            if (response.ok) {
+                alert('Użytkownik dodany!');
+                document.getElementById('addUserForm').reset();
+                loadUsers();
+            } else {
+                alert('Błąd podczas dodawania użytkownika.');
+            }
+        });
+
+        async function deleteUser(userId) {
+            if (confirm('Czy na pewno chcesz usunąć tego użytkownika?')) {
+                const response = await fetch(`/api/user/${userId}`, {
+                    method: 'DELETE'
+                });
+                if (response.ok) {
+                    alert('Użytkownik usunięty!');
+                    loadUsers();
+                } else {
+                    alert('Błąd podczas usuwania użytkownika.');
+                }
+            }
+        }
+
+        async function changePassword(userId) {
+            const newPassword = prompt('Podaj nowe hasło:');
+            if (newPassword) {
+                const response = await fetch(`/api/user/${userId}/password`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: newPassword })
+                });
+                if (response.ok) {
+                    alert('Hasło zmienione!');
+                } else {
+                    alert('Błąd podczas zmiany hasła.');
+                }
+            }
+        }
 
         loadRooms();
     </script>

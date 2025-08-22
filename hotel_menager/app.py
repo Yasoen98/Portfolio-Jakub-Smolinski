@@ -1,4 +1,4 @@
-# Zaktualizowany app.py - Dostosowujemy logi do formatu z prev/new status
+# Zaktualizowany app.py - Dodajemy API do zarządzania użytkownikami
 
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for
 from flask_cors import CORS
@@ -260,6 +260,82 @@ def get_reservations():
     reservations = cursor.fetchall()
     conn.close()
     return jsonify([{'id': res[0], 'room_number': res[1], 'type': res[2], 'check_in': res[3], 'check_out': res[4]} for res in reservations])
+
+# API do pobierania użytkowników (tylko admin)
+@app.route('/api/users', methods=['GET'])
+def get_users():
+    if 'user_id' not in session or session.get('role') != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, username, role FROM users")
+    users = cursor.fetchall()
+    conn.close()
+    return jsonify([{'id': u[0], 'username': u[1], 'role': u[2]} for u in users])
+
+# API do dodawania użytkownika (tylko admin)
+@app.route('/api/users', methods=['POST'])
+def add_user():
+    if 'user_id' not in session or session.get('role') != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    data = request.json
+    username = data.get('username')
+    password = data.get('password')
+    role = data.get('role')
+    
+    if not username or not password or not role:
+        return jsonify({'error': 'Missing fields'}), 400
+    
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    try:
+        cursor.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)", (username, password, role))
+        conn.commit()
+    except sqlite3.IntegrityError:
+        conn.close()
+        return jsonify({'error': 'Username already exists'}), 400
+    conn.close()
+    log_action(session['user_id'], 'add_user', details=f"Added user {username} ({role})")
+    return jsonify({'success': True})
+
+# API do usuwania użytkownika (tylko admin, nie można usunąć siebie)
+@app.route('/api/user/<int:user_id>', methods=['DELETE'])
+def delete_user(user_id):
+    if 'user_id' not in session or session.get('role') != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    if user_id == session['user_id']:
+        return jsonify({'error': 'Cannot delete yourself'}), 403
+    
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
+    conn.commit()
+    conn.close()
+    log_action(session['user_id'], 'delete_user', details=f"Deleted user ID {user_id}")
+    return jsonify({'success': True})
+
+# API do zmiany hasła użytkownika (tylko admin)
+@app.route('/api/user/<int:user_id>/password', methods=['PUT'])
+def change_password(user_id):
+    if 'user_id' not in session or session.get('role') != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    data = request.json
+    password = data.get('password')
+    
+    if not password:
+        return jsonify({'error': 'Missing password'}), 400
+    
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("UPDATE users SET password = ? WHERE id = ?", (password, user_id))
+    conn.commit()
+    conn.close()
+    log_action(session['user_id'], 'change_password', details=f"Changed password for user ID {user_id}")
+    return jsonify({'success': True})
 
 if __name__ == '__main__':
     app.run(debug=True)
