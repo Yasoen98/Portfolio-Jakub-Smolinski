@@ -8,13 +8,17 @@
 <body>
 <div class="container">
     <div class="main-container">
-        <div class="sidebar">
-            <h3>Menu</h3>
-            <button onclick="showView('rooms')" id="roomsBtn" class="active">Lista</button>
-            <button onclick="showView('users')" id="usersBtn">Użytkownicy</button>
-            <button onclick="showView('logs')" id="logsBtn">Logi</button>
-            <button onclick="logout()">Wyloguj</button>
-        </div>
+<div class="sidebar">
+    <div class="top-section">
+        <h3>Menu</h3>
+        <button onclick="showView('rooms')" id="roomsBtn" class="active">Lista</button>
+        <button onclick="showView('users')" id="usersBtn">Użytkownicy</button>
+        <button onclick="showView('logs')" id="logsBtn">Logi</button>
+    </div>
+    <div class="bottom-section">
+        <button onclick="logout()">Wyloguj</button>
+    </div>
+</div>
         <div class="content">
             <!-- Lista Pokoi -->
             <div id="roomsList">
@@ -89,7 +93,7 @@
 <script>
 let currentUserId = 1;
 let currentLogPage = 1;
-const logsPerPage = 10;
+const logsPerPage = 16;
 let allLogs = [];
 let logSearchTerm = "";
 
@@ -140,12 +144,13 @@ function renderRooms(page=1){
     const grid = document.getElementById('roomsGrid');
     grid.innerHTML='';
     rooms.forEach(room=>{
-        const state = room.status; // teraz status = clean / dirty / occupied
+        const state = room.status; // clean / dirty / occupied
         const card = document.createElement('div');
         card.className=`room-card room-${state} ${editMode?'editable':''}`;
         card.innerHTML = `
             ${editMode ? '<button class="delete-btn" onclick="deleteRoom('+room.id+')">x</button>' : ''}
-            <h3>Pokój ${room.number}</h3>
+            ${editMode ? '<button class="priority-btn" onclick="PrioritizeRoom('+room.id+')">!</button>' : ''}
+            <h3>${room.priority==1 ? '⚠️ Pokój '+room.number+' ⚠️' : 'Pokój '+room.number}</h3>
             <p>Typ: ${room.type}</p>
             <select onchange="changeState(${room.id}, this.value)" ${editMode?'disabled':''}>
               <option value="clean" ${state==='clean'?'selected':''}>Clean</option>
@@ -311,8 +316,8 @@ function renderLogs(page=1){
       <td>${log.time}</td>
       <td>${log.room_number}</td>
       <td>${log.username}</td>
-      <td>${log.previous}</td>
-      <td>${log.new}</td>
+      <td>${log.previous.toUpperCase()}</td>
+      <td>${log.new.toUpperCase()}</td>
     `;
     tbody.appendChild(tr);
   });
@@ -327,6 +332,16 @@ function renderLogs(page=1){
     btn.onclick=()=>renderLogs(i);
     pagination.appendChild(btn);
   }
+}
+
+async function PrioritizeRoom(id){
+    const res = await fetch(`/api/room/${id}/priority`, {method:'PUT'});
+    if(res.ok){
+        showToast("Priorytet zmieniony!");
+        loadRooms(currentRoomPage);
+    }else{
+        showToast("Błąd przy zmianie priorytetu.");
+    }
 }
 
 // Inicjalizacja

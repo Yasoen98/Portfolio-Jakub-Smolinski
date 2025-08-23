@@ -50,16 +50,9 @@
     <div class="main-container">
         <div class="sidebar">
             <h3>Menu</h3>
-            <h4>Filtruj pokoje:</h4>
-            <label>Stan pokoju:</label>
-            <select id="cleanFilter" onchange="renderRooms(1)">
-                <option value="all">Wszystkie</option>
-                <option value="clean">Clean</option>
-                <option value="dirty">Dirty</option>
-                <option value="occupied">Occupied</option>
-            </select>
-
-            <button class="logout-btn" onclick="logout()">Wyloguj</button>
+                <div class="bottom-section">
+        <button onclick="logout()">Wyloguj</button>
+    </div>
         </div>
         <div class="content">
             <h2>Lista Pokoi</h2>
@@ -104,12 +97,9 @@ async function loadRooms(){
 
 function renderRooms(page=1){
     currentRoomPage = page;
-    const filter = document.getElementById('cleanFilter').value;
 
-    let filtered = allRooms.filter(r=>{
-        if(editMode) return r.status==='dirty'; // w trybie edycji tylko dirty
-        return filter==='all' || r.status===filter;
-    });
+    // Jeśli editMode, pokazujemy tylko dirty pokoje, inaczej wszystkie
+    let filtered = allRooms.filter(r => editMode ? r.status==='dirty' : true);
 
     const start = (page-1)*roomsPerPage;
     const end = start + roomsPerPage;
@@ -122,7 +112,7 @@ function renderRooms(page=1){
         const card = document.createElement('div');
         card.className = `room-card ${state} ${editMode ? 'editable' : ''}`;
         card.innerHTML = `
-            <h3>Pokój ${r.number}</h3>
+            <h3>${r.priority==1 ? '⚠️ Pokój '+r.number+' ⚠️' : 'Pokój '+r.number}</h3>
             <p>Typ: ${r.type}</p>
 <select onchange="changeStatus(${r.id}, this.value)" ${r.status==='occupied' ? 'disabled' : ''}>
     <option value="clean" ${r.status==='clean'?'selected':''}>Clean</option>

@@ -31,7 +31,7 @@ def init_db():
     ''')
     cursor.execute("INSERT OR IGNORE INTO users (username, password, role) VALUES ('admin', 'haslo123', 'admin')")
     cursor.execute("INSERT OR IGNORE INTO users (username, password, role) VALUES ('user', 'haslo123', 'user')")
-    
+
     # Tabela rooms
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS rooms (
@@ -42,7 +42,13 @@ def init_db():
             cleanliness TEXT NOT NULL DEFAULT 'clean'
         )
     ''')
-    
+
+    # 🔧 Dodajemy kolumnę priority jeśli nie istnieje
+    cursor.execute("PRAGMA table_info(rooms)")
+    columns = [c[1] for c in cursor.fetchall()]
+    if "priority" not in columns:
+        cursor.execute("ALTER TABLE rooms ADD COLUMN priority INTEGER DEFAULT 0")
+
     # Tabela reservations
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS reservations (
@@ -56,7 +62,7 @@ def init_db():
         )
     ''')
     cursor.execute("INSERT OR IGNORE INTO reservations (user_id, room_id, check_in, check_out) VALUES (2, 1, '2025-08-20', '2025-08-25')")
-    
+
     # Tabela logs
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS logs (
@@ -68,9 +74,10 @@ def init_db():
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
-    
+
     conn.commit()
     conn.close()
+
 
 init_db()
 
@@ -137,7 +144,7 @@ def get_rooms():
     cursor.execute("SELECT * FROM rooms")
     rooms = cursor.fetchall()
     conn.close()
-    return jsonify([{'id': r[0], 'number': r[1], 'type': r[2], 'status': r[3], 'cleanliness': r[4]} for r in rooms])
+    return jsonify([{'id': r[0], 'number': r[1], 'type': r[2], 'status': r[3], 'cleanliness': r[4], 'priority': r[5]} for r in rooms])
 
 # API do dodawania pokoju (tylko admin)
 @app.route('/api/rooms', methods=['POST'])
@@ -372,6 +379,27 @@ def change_password(user_id):
     conn.close()
     log_action(session['user_id'], 'change_password', details=f"Changed password for user ID {user_id}")
     return jsonify({'success': True})
+
+#API do priorytetu pokoju
+@app.route('/api/room/<int:room_id>/priority', methods=['PUT'])
+def toggle_priority(room_id):
+    if 'user_id' not in session or session.get('role') != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT priority FROM rooms WHERE id = ?", (room_id,))
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return jsonify({'error': 'Room not found'}), 404
+    
+    new_priority = 0 if row[0] == 1 else 1
+    cursor.execute("UPDATE rooms SET priority = ? WHERE id = ?", (new_priority, room_id))
+    conn.commit()
+    conn.close()
+    log_action(session['user_id'], 'update_priority', room_id, f"Priority set to {new_priority}")
+    return jsonify({'success': True, 'priority': new_priority})
 
 if __name__ == '__main__':
     app.run(debug=True)

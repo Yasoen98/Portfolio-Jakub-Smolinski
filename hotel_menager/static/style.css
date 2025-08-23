@@ -1,7 +1,37 @@
 body{font-family:Arial,sans-serif;margin:0;padding:0;text-align-last: center;}
 .container{display:flex;flex-direction:column;height:100vh;}
 .main-container{display:flex;flex:1;}
-.sidebar{width:200px;background:#2c3e50;color:white;padding:20px;display:flex;flex-direction:column;}
+.sidebar {
+    width: 200px;
+    background: #2c3e50;
+    color: white;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between; /* top-section na górze, bottom-section na dole */
+}
+
+.top-section {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+/* Styl dla przycisku wyloguj */
+.sidebar .bottom-section button {
+    background: #c0392b;       /* ciemnoczerwone tło */
+    color: white;
+    text-align: left;
+    border-radius: 5px;
+    padding: 10px;
+    border: none;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.sidebar .bottom-section button:hover {
+    background: #e74c3c;       /* jaśniejsze czerwone po najechaniu */
+    color: white;
+}
 .sidebar h3{margin-top:0;}
 .sidebar button{margin:5px 0;padding:10px;border:none;cursor:pointer;color:white;background:#34495e;text-align:left;border-radius:5px;transition:0.3s;}
 .sidebar button.active{background:#16a085;}
@@ -18,8 +48,8 @@ body{font-family:Arial,sans-serif;margin:0;padding:0;text-align-last: center;}
 .room-card p{margin:5px 0;}
 .room-card select{margin-top:10px;padding:5px;border-radius:5px;border:none;}
 .room-clean{background:#27ae60;}
-.room-dirty{background:#e67e22;}
-.room-occupied{background:#c0392b;}
+.room-dirty{background:#c0392b;}
+.room-occupied{background:#e67e22;}
 
 /* Krzyżyk do usuwania pokoju */
 .room-card .delete-btn {
@@ -37,6 +67,23 @@ body{font-family:Arial,sans-serif;margin:0;padding:0;text-align-last: center;}
   display: none;
 }
 .room-card.editable .delete-btn {
+  display: block;
+}
+/* wykrzyknik do dodania priorytetu pokoju */
+.room-card .priority-btn {
+  position: absolute;
+  top: 8px;
+  background: red;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  font-size: 16px;
+  cursor: pointer;
+  display: none;
+}
+.room-card.editable .priority-btn {
   display: block;
 }
 
@@ -78,6 +125,41 @@ button:hover{background:#2980b9;}
   transition: 0.3s;
 }
 #editToggle:hover { background: #1abc9c; }
+/* Logi - poprawa przejrzystości */
+#logsTable {
+    width: 100%;
+    border-collapse: separate; /* umożliwia zaokrąglenie rogów */
+    border-spacing: 0;
+    margin-top: 10px;
+    background: #ffffff;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.15);
+    border-radius: 8px;
+    overflow: hidden;
+    font-size: 14px;
+}
+
+#logsTable th, #logsTable td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+#logsTable th {
+    background: #2c3e50;
+    color: white;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+#logsTable tbody tr:nth-child(even) {
+    background: #f9f9f9;
+}
+
+#logsTable tbody tr:hover {
+    background: #d0f0eb;
+    transition: background 0.2s;
+}
+
 
 /* Responsywność */
 @media(max-width:900px){.room-card{flex:0 0 calc(50% - 20px);}}
