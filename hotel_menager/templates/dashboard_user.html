@@ -1,89 +1,184 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panel - Zarządzanie Pokojami</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<meta charset="UTF-8">
+<title>Panel Użytkownika - Pokoje</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<style>
+/* Licznik pokoi do sprzątania */
+#editCounter {
+    position: fixed;
+    bottom: 90px;
+    right: 30px;
+    color: white;
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    transition: 0.3s;
+    background: #27ae60;
+}
+
+/* Tryb edycji - brudne pokoje */
+.room-card.editable { border: 2px dashed #e67e22; }
+
+/* Toast */
+#toast {
+    visibility: hidden;
+    min-width: 200px;
+    background-color: #333;
+    color: #fff;
+    text-align: center;
+    border-radius: 5px;
+    padding: 10px;
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    z-index: 1000;
+    opacity: 0;
+    transition: opacity 0.5s, visibility 0.5s;
+}
+#toast.show { visibility: visible; opacity: 1; }
+</style>
 </head>
 <body>
-    <div class="container">
-        
-        <div class="main-container">
-            <div class="sidebar">
-                <h3>Menu</h3>
-                <a href="/logout" class="button">WYLOGUJ</a>
-            </div>
-            
-            <div class="content">
-                <div id="roomsList">
-                    <h2>Lista Pokoi do Sprzątania</h2>
-                    <table id="roomsTable">
-                        <thead>
-                            <tr>
-                                <th>Numer</th>
-                                <th>Typ</th>
-                                <th>Stan</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-            </div>
+<div class="container">
+    <div class="main-container">
+        <div class="sidebar">
+            <h3>Menu</h3>
+            <h4>Filtruj pokoje:</h4>
+            <label>Stan pokoju:</label>
+            <select id="cleanFilter" onchange="renderRooms(1)">
+                <option value="all">Wszystkie</option>
+                <option value="clean">Clean</option>
+                <option value="dirty">Dirty</option>
+                <option value="occupied">Occupied</option>
+            </select>
+
+            <button class="logout-btn" onclick="logout()">Wyloguj</button>
+        </div>
+        <div class="content">
+            <h2>Lista Pokoi</h2>
+            <div id="roomsGrid" class="room-grid"></div>
+            <div id="roomsPagination" class="pagination"></div>
         </div>
     </div>
+</div>
 
-    <script>
-        async function loadRooms() {
-            const response = await fetch('/api/rooms');
-            const rooms = await response.json();
-            const tbody = document.querySelector('#roomsTable tbody');
-            tbody.innerHTML = '';
-            const filteredRooms = rooms.filter(room => room.status === 'occupied' || room.cleanliness === 'dirty');
-            filteredRooms.forEach(room => {
-                let state;
-                if (room.status === 'occupied') {
-                    state = 'occupied';
-                } else {
-                    state = room.cleanliness;
-                }
-                const rowClass = `row-${state}`;
-                const tr = document.createElement('tr');
-                tr.className = rowClass;
-                let selectHtml = '';
-                if (room.status !== 'occupied' && room.cleanliness === 'dirty') {
-                    selectHtml = `
-                        <select onchange="changeState(${room.id}, this.value)">
-                            <option value="dirty" selected>Dirty</option>
-                            <option value="clean">Clean</option>
-                        </select>
-                    `;
-                } else if (room.status === 'occupied') {
-                    selectHtml = 'Occupied';
-                } else {
-                    selectHtml = state.charAt(0).toUpperCase() + state.slice(1);  // Dla clean, jeśli jakimś cudem
-                }
-                tr.innerHTML = `
-                    <td>${room.number}</td>
-                    <td>${room.type}</td>
-                    <td>${selectHtml}</td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
+<!-- Guzik trybu edycji -->
+<button id="editToggle">🧹</button>
+<!-- Licznik pokoi do sprzątania -->
+<div id="editCounter">0</div>
 
-        async function changeState(roomId, value) {
-            if (value === 'clean') {
-                await fetch(`/api/room/${roomId}/cleanliness`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ cleanliness: 'clean' })
-                });
-            }
-            loadRooms();
-        }
+<div id="toast"></div>
 
-        loadRooms();
-    </script>
+<script>
+let currentRoomPage = 1;
+const roomsPerPage = 12;
+let allRooms = [];
+let editMode = false;
+
+function showToast(msg){
+    const toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.className = 'show';
+    setTimeout(()=>{ toast.className=''; },3000);
+}
+
+function logout(){
+    fetch('/logout').then(()=>window.location.href='/');
+}
+
+async function loadRooms(){
+    const res = await fetch('/api/rooms');
+    if(res.status===401){ window.location.href='/'; return; }
+    allRooms = await res.json();
+    allRooms.sort((a,b)=>parseInt(a.number)-parseInt(b.number));
+    renderRooms(currentRoomPage);
+    updateEditCounter();
+}
+
+function renderRooms(page=1){
+    currentRoomPage = page;
+    const filter = document.getElementById('cleanFilter').value;
+
+    let filtered = allRooms.filter(r=>{
+        if(editMode) return r.status==='dirty'; // w trybie edycji tylko dirty
+        return filter==='all' || r.status===filter;
+    });
+
+    const start = (page-1)*roomsPerPage;
+    const end = start + roomsPerPage;
+    const rooms = filtered.slice(start,end);
+
+    const grid = document.getElementById('roomsGrid');
+    grid.innerHTML = '';
+    rooms.forEach(r=>{
+        let state = r.status==='occupied' ? 'room-occupied' : r.status==='clean' ? 'room-clean' : 'room-dirty';
+        const card = document.createElement('div');
+        card.className = `room-card ${state} ${editMode ? 'editable' : ''}`;
+        card.innerHTML = `
+            <h3>Pokój ${r.number}</h3>
+            <p>Typ: ${r.type}</p>
+<select onchange="changeStatus(${r.id}, this.value)" ${r.status==='occupied' ? 'disabled' : ''}>
+    <option value="clean" ${r.status==='clean'?'selected':''}>Clean</option>
+    <option value="dirty" ${r.status==='dirty'?'selected':''}>Dirty</option>
+    <option value="occupied" disabled ${r.status==='occupied'?'selected':''}>Occupied</option>
+</select>
+        `;
+        grid.appendChild(card);
+    });
+
+    // Paginacja
+    const pagination = document.getElementById('roomsPagination');
+    pagination.innerHTML='';
+    const totalPages = Math.ceil(filtered.length/roomsPerPage);
+    for(let i=1;i<=totalPages;i++){
+        const btn = document.createElement('button');
+        btn.textContent = i;
+        btn.className = i===currentRoomPage ? 'pageBtn active' : 'pageBtn';
+        btn.onclick = ()=>renderRooms(i);
+        pagination.appendChild(btn);
+    }
+
+    updateEditCounter();
+}
+
+// Zmiana statusu pokoju (tylko dirty → clean dla usera)
+async function changeStatus(id, newStatus){
+    const res = await fetch(`/api/room/${id}`, {
+        method:'PUT',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({status: newStatus})
+    });
+    if(res.ok){ 
+        showToast(`Zmieniono status pokoju!`); 
+        loadRooms(); 
+    } else {
+        const data = await res.json();
+        showToast(data.error || 'Błąd!');
+    }
+}
+
+// Guzik trybu edycji
+document.getElementById('editToggle').addEventListener('click', ()=>{
+    editMode = !editMode;
+    renderRooms(1);
+});
+
+// Licznik pokoi do sprzątania
+function updateEditCounter(){
+    const count = allRooms.filter(r=>r.status==='dirty').length;
+    const counter = document.getElementById('editCounter');
+    counter.textContent = count;
+    counter.style.background = count>0 ? '#e67e22' : '#27ae60';
+}
+
+loadRooms();
+</script>
 </body>
 </html>

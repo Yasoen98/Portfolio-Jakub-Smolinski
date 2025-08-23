@@ -1,365 +1,339 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panel - Zarządzanie Pokojami</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<meta charset="UTF-8">
+<title>Panel Zarządzania Hotelem - Admin</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <body data-user-id="{{ current_user_id }}"></body>
-    <div class="container">
-        
-        <div class="main-container">
-            <div class="sidebar">
-                <h3>Menu</h3>
-                <button id="listButton" class="active" onclick="showView('rooms')">Lista</button>
-                <button id="manageButton" onclick="showView('manage')">Zarządzaj</button>
-                <button id="usersButton" onclick="showView('users')">Użytkownicy</button>
-                <button id="logsButton" onclick="showView('logs')">Logs</button>
-                <a href="/logout" class="button">WYLOGUJ</a>
+<div class="container">
+    <div class="main-container">
+        <div class="sidebar">
+            <h3>Menu</h3>
+            <button onclick="showView('rooms')" id="roomsBtn" class="active">Lista</button>
+            <button onclick="showView('users')" id="usersBtn">Użytkownicy</button>
+            <button onclick="showView('logs')" id="logsBtn">Logi</button>
+            <button onclick="logout()">Wyloguj</button>
+        </div>
+        <div class="content">
+            <!-- Lista Pokoi -->
+            <div id="roomsList">
+                <h2>Lista Pokoi</h2>
+                <div id="roomsGrid" class="room-grid"></div>
+                <div id="roomsPagination" class="pagination"></div>
+                <!-- Formularz dodawania pokoi -->
+                <form id="addRoomForm" style="display:none;">
+                    <label>Numery pokoi (np. 101;102;103):</label>
+                    <input type="text" id="roomNumbers" required>
+                    <label>Typ pokoju:</label>
+                    <select id="roomType">
+                        <option value="single">Single</option>
+                        <option value="double">Double</option>
+                    </select>
+                    <button type="button" onclick="addRooms()">Dodaj pokoje</button>
+                </form>
             </div>
-            
-            <div class="content">
-                <div id="roomsList" style="display: block;">
-                    <h2>Lista Pokoi</h2>
-                    <table id="roomsTable">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Numer</th>
-                                <th>Typ</th>
-                                <th>Stan</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-                
-                <div id="manageSection" style="display: none;">
-                    <h2>Dodaj Nowy Pokój</h2>
-                    <form id="addRoomForm">
-                        <label for="number">Numer pokoju:</label>
-                        <input type="text" id="number" required>
-                        
-                        <label for="type">Typ:</label>
-                        <select id="type" required>
-                            <option value="single">Single</option>
-                            <option value="double">Double</option>
-                        </select>
-                        
-                        <button type="submit">Dodaj</button>
-                    </form>
-                    
-                    <h2>Usuń Pokój</h2>
-                    <form id="deleteRoomForm">
-                        <label for="deleteSelect">Wybierz pokój do usunięcia:</label>
-                        <select id="deleteSelect" required>
-                            <option value="">-- Wybierz --</option>
-                        </select>
-                        <button type="submit">Usuń</button>
-                    </form>
-                </div>
 
-                <div id="usersSection" style="display: none;">
-                    <h2>Lista Użytkowników</h2>
-                    <table id="usersTable">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Username</th>
-                                <th>Role</th>
-                                <th>Akcje</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
+            <!-- Użytkownicy -->
+            <div id="usersSection">
+                <h2>Użytkownicy</h2>
+                <table id="usersTable">
+                    <thead>
+                        <tr><th>ID</th><th>Username</th><th>Rola</th><th>Akcje</th></tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+                <button id="addUserToggle" class="addUserBtn">Dodaj użytkownika +</button>
+                <form id="addUserForm" style="display:none;">
+                    <label>Username:</label>
+                    <input type="text" id="newUsername" required>
+                    <label>Hasło:</label>
+                    <input type="password" id="newPassword" required>
+                    <label>Rola:</label>
+                    <select id="newRole">
+                        <option value="admin">Admin</option>
+                        <option value="user">User</option>
+                    </select>
+                    <button type="button" onclick="addUser()">Dodaj użytkownika</button>
+                </form>
+            </div>
 
-                    <h2>Dodaj Nowego Użytkownika</h2>
-                    <form id="addUserForm">
-                        <label for="newUsername">Nazwa użytkownika:</label>
-                        <input type="text" id="newUsername" required>
-                        
-                        <label for="newPassword">Hasło:</label>
-                        <input type="password" id="newPassword" required>
-                        
-                        <label for="newRole">Uprawnienia:</label>
-                        <select id="newRole" required>
-                            <option value="user">User</option>
-                            <option value="admin">Admin</option>
-                        </select>
-                        
-                        <button type="submit">Dodaj</button>
-                    </form>
-                </div>
-
-                <div id="logsSection" style="display: none;">
-                    <h2>Logi Zmian Statusu</h2>
-                    <table id="logsTable">
-                        <thead>
-                            <tr>
-                                <th>Data</th>
-                                <th>Godzina</th>
-                                <th>Numer Pokoju</th>
-                                <th>Użytkownik</th>
-                                <th>Poprzedni Status</th>
-                                <th>Nowy Status</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
+            <!-- Logi -->
+            <div id="logsSection">
+                <h2>Logi</h2>
+                <input type="text" id="logSearch" placeholder="Szukaj po użytkowniku..." oninput="applyLogFilter()">
+                <table id="logsTable">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Czas</th>
+                            <th>Pokój</th>
+                            <th>Użytkownik</th>
+                            <th>Poprzedni stan</th>
+                            <th>Nowy stan</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+                <div id="logsPagination" class="pagination"></div>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- Przekazanie ID aktualnego użytkownika do JS -->
+<!-- Guzik trybu edycji -->
+<button id="editToggle">🔧</button>
+
+<div id="toast"></div>
+
 <script>
-    const currentUserId = parseInt(document.body.dataset.userId);
+let currentUserId = 1;
+let currentLogPage = 1;
+const logsPerPage = 10;
+let allLogs = [];
+let logSearchTerm = "";
+
+// Rooms
+let currentRoomPage = 1;
+const roomsPerPage = 15;
+let allRooms = [];
+let editMode = false;
+
+// Toast
+function showToast(message){
+    const toast = document.getElementById('toast');
+    toast.textContent = message;
+    toast.className = 'show';
+    setTimeout(()=>{ toast.className = toast.className.replace('show',''); },3000);
+}
+
+// Widoki
+function showView(view){
+    document.getElementById('roomsList').style.display = view==='rooms'?'block':'none';
+    document.getElementById('usersSection').style.display = view==='users'?'block':'none';
+    document.getElementById('logsSection').style.display = view==='logs'?'block':'none';
+
+    document.getElementById('roomsBtn').classList.toggle('active', view==='rooms');
+    document.getElementById('usersBtn').classList.toggle('active', view==='users');
+    document.getElementById('logsBtn').classList.toggle('active', view==='logs');
+}
+
+// Logout
+function logout(){
+    fetch('/logout').then(()=>window.location.href='/');
+}
+
+// Pokoje
+async function loadRooms(page=1){
+    const res = await fetch('/api/rooms');
+    if(res.status===401){ window.location.href='/'; return; }
+    allRooms = await res.json();
+    allRooms.sort((a,b)=>parseInt(a.number)-parseInt(b.number));
+    renderRooms(page);
+}
+function renderRooms(page=1){
+    currentRoomPage = page;
+    const start = (page-1)*roomsPerPage;
+    const end = start+roomsPerPage;
+    const rooms = allRooms.slice(start,end);
+
+    const grid = document.getElementById('roomsGrid');
+    grid.innerHTML='';
+    rooms.forEach(room=>{
+        const state = room.status; // teraz status = clean / dirty / occupied
+        const card = document.createElement('div');
+        card.className=`room-card room-${state} ${editMode?'editable':''}`;
+        card.innerHTML = `
+            ${editMode ? '<button class="delete-btn" onclick="deleteRoom('+room.id+')">x</button>' : ''}
+            <h3>Pokój ${room.number}</h3>
+            <p>Typ: ${room.type}</p>
+            <select onchange="changeState(${room.id}, this.value)" ${editMode?'disabled':''}>
+              <option value="clean" ${state==='clean'?'selected':''}>Clean</option>
+              <option value="dirty" ${state==='dirty'?'selected':''}>Dirty</option>
+              <option value="occupied" ${state==='occupied'?'selected':''}>Occupied</option>
+            </select>`;
+        grid.appendChild(card);
+    });
+
+    // paginacja
+    const pagination = document.getElementById('roomsPagination');
+    pagination.innerHTML='';
+    const totalPages = Math.ceil(allRooms.length/roomsPerPage);
+    for(let i=1;i<=totalPages;i++){
+        const btn = document.createElement('button');
+        btn.textContent=i;
+        btn.className = (i===currentRoomPage)?'pageBtn active':'pageBtn';
+        btn.onclick = ()=>renderRooms(i);
+        pagination.appendChild(btn);
+    }
+}
+
+async function changeState(id, value){
+    await fetch(`/api/room/${id}`,{
+        method:'PUT',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({status:value})
+    });
+    loadRooms(currentRoomPage);
+}
+
+document.getElementById('editToggle').addEventListener('click', ()=>{
+    editMode = !editMode;
+    document.getElementById('addRoomForm').style.display = editMode?'block':'none';
+    renderRooms(currentRoomPage);
+});
+
+async function deleteRoom(id){
+    if(!confirm('Na pewno usunąć pokój?')) return;
+    const res = await fetch(`/api/room/${id}`,{method:'DELETE'});
+    if(res.ok){ showToast('Pokój usunięty'); loadRooms(currentRoomPage); }
+    else showToast('Błąd przy usuwaniu pokoju.');
+}
+
+async function addRooms(){
+    const numbers = document.getElementById('roomNumbers').value.split(';').map(n=>n.trim()).filter(Boolean);
+    const type = document.getElementById('roomType').value;
+    for(let num of numbers){
+        await fetch('/api/rooms',{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({number:num,type})
+        });
+    }
+    showToast('Dodano pokoje!');
+    document.getElementById('addRoomForm').reset();
+    loadRooms(currentRoomPage);
+}
+
+// Użytkownicy
+async function loadUsers(){
+    const res = await fetch('/api/users');
+    if(res.status===401){ window.location.href='/'; return; }
+    const users = await res.json();
+    const tbody = document.querySelector('#usersTable tbody');
+    tbody.innerHTML='';
+
+    users.forEach(user=>{
+        const tr = document.createElement('tr');
+        const isCur = user.id === currentUserId;
+        tr.innerHTML = `
+            <td>${user.id}</td>
+            <td>${user.username}</td>
+            <td>${user.role}</td>
+            <td>
+                <button class="changePassBtn">Zmień hasło</button>
+                ${isCur ? '' : `<button class="deleteUserBtn">Usuń</button>`}
+            </td>
+        `;
+        tbody.appendChild(tr);
+
+        tr.querySelector('.changePassBtn').addEventListener('click', ()=>changePassword(user.id));
+        if(!isCur){
+            tr.querySelector('.deleteUserBtn').addEventListener('click', ()=>deleteUser(user.id));
+        }
+    });
+}
+
+document.getElementById('addUserToggle').addEventListener('click', ()=>{
+    const form = document.getElementById('addUserForm');
+    form.style.display = form.style.display==='none'?'block':'none';
+});
+
+async function addUser(){
+    const username = document.getElementById('newUsername').value;
+    const password = document.getElementById('newPassword').value;
+    const role = document.getElementById('newRole').value;
+
+    const res = await fetch('/api/users',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({username,password,role})
+    });
+
+    if(res.ok){
+        showToast('Użytkownik dodany!');
+        document.getElementById('addUserForm').reset();
+        document.getElementById('addUserForm').style.display='none';
+        loadUsers();
+    }else{
+        const err = await res.json();
+        showToast(err.error || 'Błąd dodawania użytkownika.');
+    }
+}
+
+async function changePassword(id){
+    const newPass = prompt('Nowe hasło:');
+    if(!newPass) return;
+    await fetch(`/api/user/${id}/password`,{
+        method:'PUT',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({password:newPass})
+    });
+    showToast('Hasło zmienione!');
+}
+
+async function deleteUser(id){
+    if(!confirm('Na pewno usunąć użytkownika?')) return;
+    const res = await fetch(`/api/user/${id}`,{method:'DELETE'});
+    if(res.ok){ loadUsers(); showToast('Użytkownik usunięty!'); }
+    else showToast('Błąd przy usuwaniu.');
+}
+
+// Logi
+async function loadLogs(page=1){
+  const res = await fetch('/api/logs');
+  if(res.status===401){ window.location.href='/'; return; }
+  allLogs = await res.json();
+  renderLogs(page);
+}
+
+function applyLogFilter(){
+  logSearchTerm = document.getElementById('logSearch').value.toLowerCase();
+  renderLogs(1);
+}
+
+function renderLogs(page=1){
+  currentLogPage = page;
+  let filtered = allLogs;
+  if(logSearchTerm){
+    filtered = allLogs.filter(l=> l.username && l.username.toLowerCase().includes(logSearchTerm));
+  }
+  const start=(page-1)*logsPerPage;
+  const end=start+logsPerPage;
+  const logs = filtered.slice(start,end);
+
+  const tbody = document.querySelector('#logsTable tbody');
+  tbody.innerHTML='';
+  logs.forEach(log=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${log.date}</td>
+      <td>${log.time}</td>
+      <td>${log.room_number}</td>
+      <td>${log.username}</td>
+      <td>${log.previous}</td>
+      <td>${log.new}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  const pagination=document.getElementById('logsPagination');
+  pagination.innerHTML='';
+  const totalPages=Math.ceil(filtered.length/logsPerPage);
+  for(let i=1;i<=totalPages;i++){
+    const btn=document.createElement('button');
+    btn.textContent=i;
+    btn.className=(i===currentLogPage)?'pageBtn active':'pageBtn';
+    btn.onclick=()=>renderLogs(i);
+    pagination.appendChild(btn);
+  }
+}
+
+// Inicjalizacja
+showView('rooms'); // domyślnie widok pokoi
+loadRooms();
+loadUsers();
+loadLogs();
 </script>
-
-    <script>
-        function showView(view) {
-            const roomsList = document.getElementById('roomsList');
-            const manageSection = document.getElementById('manageSection');
-            const usersSection = document.getElementById('usersSection');
-            const logsSection = document.getElementById('logsSection');
-            const listButton = document.getElementById('listButton');
-            const manageButton = document.getElementById('manageButton');
-            const usersButton = document.getElementById('usersButton');
-            const logsButton = document.getElementById('logsButton');
-            
-            // Ukryj wszystkie sekcje
-            roomsList.style.display = 'none';
-            manageSection.style.display = 'none';
-            usersSection.style.display = 'none';
-            logsSection.style.display = 'none';
-
-            // Usuń klasę active ze wszystkich buttonów
-            listButton.classList.remove('active');
-            manageButton.classList.remove('active');
-            usersButton.classList.remove('active');
-            logsButton.classList.remove('active');
-
-            if (view === 'rooms') {
-                roomsList.style.display = 'block';
-                listButton.classList.add('active');
-                loadRooms();
-            } else if (view === 'manage') {
-                manageSection.style.display = 'block';
-                manageButton.classList.add('active');
-                loadDeleteOptions();
-            } else if (view === 'users') {
-                usersSection.style.display = 'block';
-                usersButton.classList.add('active');
-                loadUsers();
-            } else if (view === 'logs') {
-                logsSection.style.display = 'block';
-                logsButton.classList.add('active');
-                loadLogs();
-            }
-        }
-
-        async function loadRooms() {
-            const response = await fetch('/api/rooms');
-            const rooms = await response.json();
-            const tbody = document.querySelector('#roomsTable tbody');
-            tbody.innerHTML = '';
-            rooms.forEach(room => {
-                let state;
-                if (room.status === 'occupied') {
-                    state = 'occupied';
-                } else if (room.cleanliness === 'clean') {
-                    state = 'clean';
-                } else {
-                    state = 'dirty';
-                }
-                const rowClass = `row-${state}`;
-                const tr = document.createElement('tr');
-                tr.className = rowClass;
-                tr.innerHTML = `
-                    <td>${room.id}</td>
-                    <td>${room.number}</td>
-                    <td>${room.type}</td>
-                    <td>
-                        <select onchange="changeState(${room.id}, this.value)">
-                            <option value="clean" ${state === 'clean' ? 'selected' : ''}>Clean</option>
-                            <option value="dirty" ${state === 'dirty' ? 'selected' : ''}>Dirty</option>
-                            <option value="occupied" ${state === 'occupied' ? 'selected' : ''}>Occupied</option>
-                        </select>
-                    </td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
-
-        async function loadDeleteOptions() {
-            const response = await fetch('/api/rooms');
-            const rooms = await response.json();
-            const select = document.getElementById('deleteSelect');
-            select.innerHTML = '<option value="">-- Wybierz --</option>';  // Reset opcji
-            rooms.forEach(room => {
-                const option = document.createElement('option');
-                option.value = room.id;
-                option.textContent = `${room.number} - ${room.type}`;
-                select.appendChild(option);
-            });
-        }
-
-        async function loadUsers() {
-            const response = await fetch('/api/users');
-            const users = await response.json();
-            const tbody = document.querySelector('#usersTable tbody');
-            tbody.innerHTML = '';
-            users.forEach(user => {
-                const tr = document.createElement('tr');
-                const isCurrentUser = user.id === currentUserId;
-                tr.innerHTML = `
-                    <td>${user.id}</td>
-                    <td>${user.username}</td>
-                    <td>${user.role}</td>
-                    <td>
-                        <button onclick="changePassword(${user.id})" class="action-btn">/</button>
-                        ${isCurrentUser ? '' : `<button onclick="deleteUser(${user.id})" class="action-btn">x</button>`}
-                    </td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
-
-        async function loadLogs() {
-            const response = await fetch('/api/logs');
-            const logs = await response.json();
-            const tbody = document.querySelector('#logsTable tbody');
-            tbody.innerHTML = '';
-            logs.forEach(log => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${log.date}</td>
-                    <td>${log.time}</td>
-                    <td>${log.room_number}</td>
-                    <td>${log.username}</td>
-                    <td>${log.previous}</td>
-                    <td>${log.new}</td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
-
-        async function changeState(roomId, value) {
-            if (value === 'occupied') {
-                await fetch(`/api/room/${roomId}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ status: 'occupied' })
-                });
-            } else {
-                await fetch(`/api/room/${roomId}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ status: 'free' })
-                });
-                await fetch(`/api/room/${roomId}/cleanliness`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ cleanliness: value })
-                });
-            }
-            loadRooms();
-        }
-
-        document.getElementById('addRoomForm').addEventListener('submit', async function(event) {
-            event.preventDefault();
-            const number = document.getElementById('number').value;
-            const type = document.getElementById('type').value;
-            
-            const response = await fetch('/api/rooms', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ number, type })
-            });
-            
-            if (response.ok) {
-                alert('Pokój dodany!');
-                document.getElementById('addRoomForm').reset();
-                loadDeleteOptions();
-            } else {
-                alert('Błąd podczas dodawania pokoju.');
-            }
-        });
-
-        document.getElementById('deleteRoomForm').addEventListener('submit', async function(event) {
-            event.preventDefault();
-            const deleteId = document.getElementById('deleteSelect').value;
-            if (!deleteId) {
-                alert('Wybierz pokój do usunięcia.');
-                return;
-            }
-            
-            const response = await fetch(`/api/room/${deleteId}`, {
-                method: 'DELETE'
-            });
-            
-            if (response.ok) {
-                alert('Pokój usunięty!');
-                loadDeleteOptions();
-            } else {
-                alert('Błąd podczas usuwania pokoju.');
-            }
-        });
-
-        document.getElementById('addUserForm').addEventListener('submit', async function(event) {
-            event.preventDefault();
-            const username = document.getElementById('newUsername').value;
-            const password = document.getElementById('newPassword').value;
-            const role = document.getElementById('newRole').value;
-            
-            const response = await fetch('/api/users', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password, role })
-            });
-            
-            if (response.ok) {
-                alert('Użytkownik dodany!');
-                document.getElementById('addUserForm').reset();
-                loadUsers();
-            } else {
-                alert('Błąd podczas dodawania użytkownika.');
-            }
-        });
-
-        async function deleteUser(userId) {
-            if (confirm('Czy na pewno chcesz usunąć tego użytkownika?')) {
-                const response = await fetch(`/api/user/${userId}`, {
-                    method: 'DELETE'
-                });
-                if (response.ok) {
-                    alert('Użytkownik usunięty!');
-                    loadUsers();
-                } else {
-                    alert('Błąd podczas usuwania użytkownika.');
-                }
-            }
-        }
-
-        async function changePassword(userId) {
-            const newPassword = prompt('Podaj nowe hasło:');
-            if (newPassword) {
-                const response = await fetch(`/api/user/${userId}/password`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ password: newPassword })
-                });
-                if (response.ok) {
-                    alert('Hasło zmienione!');
-                } else {
-                    alert('Błąd podczas zmiany hasła.');
-                }
-            }
-        }
-
-        loadRooms();
-    </script>
 </body>
 </html>

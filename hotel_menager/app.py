@@ -154,12 +154,14 @@ def add_room():
     
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO rooms (number, type, status, cleanliness) VALUES (?, ?, 'free', 'clean')", (number, room_type))
+    # ustawiamy status='clean' zamiast 'free'
+    cursor.execute("INSERT INTO rooms (number, type, status) VALUES (?, ?, 'clean')", (number, room_type))
     room_id = cursor.lastrowid
     conn.commit()
     conn.close()
     log_action(session['user_id'], 'add_room', room_id, f"Added room {number} ({room_type})")
     return jsonify({'success': True})
+
 
 # API do usuwania pokoju (tylko admin)
 @app.route('/api/room/<int:room_id>', methods=['DELETE'])
@@ -178,22 +180,40 @@ def delete_room(room_id):
 # API do aktualizacji statusu pokoju (tylko admin)
 @app.route('/api/room/<int:room_id>', methods=['PUT'])
 def update_room(room_id):
-    if 'user_id' not in session or session.get('role') != 'admin':
+    if 'user_id' not in session:
         return jsonify({'error': 'Unauthorized'}), 401
     
+    role = session.get('role')
     data = request.json
     status = data.get('status')
     
+    if status not in ('clean', 'dirty', 'occupied'):
+        return jsonify({'error': 'Invalid status'}), 400
+
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("SELECT cleanliness FROM rooms WHERE id = ?", (room_id,))
-    prev_clean = cursor.fetchone()[0]
+    cursor.execute("SELECT status FROM rooms WHERE id = ?", (room_id,))
+    current_status = cursor.fetchone()
+    
+    if not current_status:
+        conn.close()
+        return jsonify({'error': 'Room not found'}), 404
+
+    current_status = current_status[0]
+
+    # Zwykły użytkownik może tylko zmienić dirty <-> clean
+    if role == 'user':
+        if current_status not in ('dirty','clean') or status not in ('dirty','clean'):
+            conn.close()
+            return jsonify({'error': 'Unauthorized'}), 401
+
     cursor.execute("UPDATE rooms SET status = ? WHERE id = ?", (status, room_id))
     conn.commit()
     conn.close()
-    if status == 'occupied':
-        log_action(session['user_id'], 'update_status', room_id, f"Previous: {prev_clean} New: {status}")
+    log_action(session['user_id'], 'update_status', room_id, f"Previous: {current_status} New: {status}")
     return jsonify({'success': True})
+
+
 
 # API do aktualizacji cleanliness (dla wszystkich)
 @app.route('/api/room/<int:room_id>/cleanliness', methods=['PUT'])
@@ -219,27 +239,43 @@ def update_cleanliness(room_id):
 def get_logs():
     if 'user_id' not in session or session.get('role') != 'admin':
         return jsonify({'error': 'Unauthorized'}), 401
-    
+
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute("""
         SELECT logs.timestamp, rooms.number, users.username, logs.details
         FROM logs
-        JOIN users ON logs.user_id = users.id
-        JOIN rooms ON logs.room_id = rooms.id
+        LEFT JOIN users ON logs.user_id = users.id
+        LEFT JOIN rooms ON logs.room_id = rooms.id
         WHERE action_type IN ('update_status', 'update_cleanliness')
         ORDER BY logs.timestamp DESC
     """)
     logs = cursor.fetchall()
     conn.close()
+
     formatted_logs = []
     for log in logs:
         timestamp = log[0]
-        date, time = timestamp.split(' ')
-        prev_new = log[3].split(' New: ')
-        prev = prev_new[0].replace('Previous: ', '')
-        new = prev_new[1]
-        formatted_logs.append({'date': date, 'time': time, 'room_number': log[1], 'username': log[2], 'previous': prev, 'new': new})
+        date, time = timestamp.split(" ")
+        room_number = log[1] if log[1] else "-"
+        username = log[2] if log[2] else "SYSTEM"
+
+        prev, new = "-", "-"
+        if log[3]:
+            parts = log[3].split(" New: ")
+            if len(parts) == 2:
+                prev = parts[0].replace("Previous: ", "")
+                new = parts[1]
+
+        formatted_logs.append({
+            "date": date,
+            "time": time,
+            "room_number": room_number,
+            "username": username,
+            "previous": prev,
+            "new": new
+        })
+
     return jsonify(formatted_logs)
 
 # API do pobierania rezerwacji użytkownika (dla usera)
