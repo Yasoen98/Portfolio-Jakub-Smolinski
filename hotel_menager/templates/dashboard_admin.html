@@ -4,21 +4,56 @@
 <meta charset="UTF-8">
 <title>Panel Zarządzania Hotelem - Admin</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<style>
+/* --- Dodatkowy CSS dla czatu --- */
+.chat-window {
+    border:1px solid #ccc;
+    border-radius:10px;
+    padding:10px;
+    background:#f9f9f9;
+    max-width:400px;
+    display:flex;
+    flex-direction:column;
+    position:relative;
+    margin-top:10px;
+}
+.chat-messages {
+    flex:1;
+    overflow-y:auto;
+    margin-bottom:10px;
+    max-height:300px;
+}
+.message.sent { background:#dcf8c6; text-align:right; padding:5px 10px; border-radius:10px; margin:5px 0; }
+.message.received { background:#fff; text-align:left; padding:5px 10px; border-radius:10px; margin:5px 0; }
+.close-chat {
+    position:absolute;
+    top:5px;
+    right:5px;
+    border:none;
+    background:transparent;
+    font-size:16px;
+    cursor:pointer;
+}
+.chat-input { display:flex; gap:5px; }
+.chat-input input { flex:1; padding:5px; border-radius:5px; border:1px solid #ccc; }
+.chat-input button { padding:5px 10px; border-radius:5px; border:none; background:#007bff; color:white; cursor:pointer; }
+</style>
 </head>
 <body>
 <div class="container">
     <div class="main-container">
-<div class="sidebar">
-    <div class="top-section">
-        <h3>Menu</h3>
-        <button onclick="showView('rooms')" id="roomsBtn" class="active">Lista</button>
-        <button onclick="showView('users')" id="usersBtn">Użytkownicy</button>
-        <button onclick="showView('logs')" id="logsBtn">Logi</button>
-    </div>
-    <div class="bottom-section">
-        <button onclick="logout()">Wyloguj</button>
-    </div>
-</div>
+        <div class="sidebar">
+            <div class="top-section">
+                <h3>Menu</h3>
+                <button onclick="showView('rooms')" id="roomsBtn" class="active">Lista</button>
+                <button onclick="showView('users')" id="usersBtn">Użytkownicy</button>
+                <button onclick="showView('logs')" id="logsBtn">Logi</button>
+                <button onclick="showView('tickets')" id="ticketsBtn">Zgłoszenia</button>
+            </div>
+            <div class="bottom-section">
+                <button onclick="logout()">Wyloguj</button>
+            </div>
+        </div>
         <div class="content">
             <!-- Lista Pokoi -->
             <div id="roomsList">
@@ -39,7 +74,7 @@
             </div>
 
             <!-- Użytkownicy -->
-            <div id="usersSection">
+            <div id="usersSection" style="display:none;">
                 <h2>Użytkownicy</h2>
                 <table id="usersTable">
                     <thead>
@@ -63,7 +98,7 @@
             </div>
 
             <!-- Logi -->
-            <div id="logsSection">
+            <div id="logsSection" style="display:none;">
                 <h2>Logi</h2>
                 <input type="text" id="logSearch" placeholder="Szukaj po użytkowniku..." oninput="applyLogFilter()">
                 <table id="logsTable">
@@ -81,13 +116,29 @@
                 </table>
                 <div id="logsPagination" class="pagination"></div>
             </div>
+
+            <!-- Zgłoszenia i czat -->
+            <div id="ticketsSection" style="display:none;">
+                <h2>Zgłoszenia od użytkowników</h2>
+                <div id="ticketsAdminList"></div>
+
+                <!-- Osadzony czat -->
+                <div id="chatSection" class="chat-window" style="display:none;">
+                    <button class="close-chat" onclick="closeChat()">✖</button>
+                    <div id="chatWindow" class="chat-messages"></div>
+                    <div class="chat-input">
+                        <input type="text" id="chatMessage" placeholder="Napisz wiadomość...">
+                        <button onclick="sendChatMessage()">Wyślij</button>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
 </div>
 
 <!-- Guzik trybu edycji -->
 <button id="editToggle">🔧</button>
-
 <div id="toast"></div>
 
 <script>
@@ -97,13 +148,14 @@ const logsPerPage = 16;
 let allLogs = [];
 let logSearchTerm = "";
 
-// Rooms
 let currentRoomPage = 1;
 const roomsPerPage = 15;
 let allRooms = [];
 let editMode = false;
 
-// Toast
+let currentTicketId = null;
+
+// --- TOAST ---
 function showToast(message){
     const toast = document.getElementById('toast');
     toast.textContent = message;
@@ -111,23 +163,23 @@ function showToast(message){
     setTimeout(()=>{ toast.className = toast.className.replace('show',''); },3000);
 }
 
-// Widoki
+// --- Widoki ---
 function showView(view){
     document.getElementById('roomsList').style.display = view==='rooms'?'block':'none';
     document.getElementById('usersSection').style.display = view==='users'?'block':'none';
     document.getElementById('logsSection').style.display = view==='logs'?'block':'none';
+    document.getElementById('ticketsSection').style.display = view==='tickets'?'block':'none';
 
     document.getElementById('roomsBtn').classList.toggle('active', view==='rooms');
     document.getElementById('usersBtn').classList.toggle('active', view==='users');
     document.getElementById('logsBtn').classList.toggle('active', view==='logs');
+    document.getElementById('ticketsBtn').classList.toggle('active', view==='tickets');
 }
 
-// Logout
-function logout(){
-    fetch('/logout').then(()=>window.location.href='/');
-}
+// --- Logout ---
+function logout(){ fetch('/logout').then(()=>window.location.href='/'); }
 
-// Pokoje
+// --- Pokoje ---
 async function loadRooms(page=1){
     const res = await fetch('/api/rooms');
     if(res.status===401){ window.location.href='/'; return; }
@@ -135,6 +187,7 @@ async function loadRooms(page=1){
     allRooms.sort((a,b)=>parseInt(a.number)-parseInt(b.number));
     renderRooms(page);
 }
+
 function renderRooms(page=1){
     currentRoomPage = page;
     const start = (page-1)*roomsPerPage;
@@ -144,7 +197,7 @@ function renderRooms(page=1){
     const grid = document.getElementById('roomsGrid');
     grid.innerHTML='';
     rooms.forEach(room=>{
-        const state = room.status; // clean / dirty / occupied
+        const state = room.status;
         const card = document.createElement('div');
         card.className=`room-card room-${state} ${editMode?'editable':''}`;
         card.innerHTML = `
@@ -160,7 +213,6 @@ function renderRooms(page=1){
         grid.appendChild(card);
     });
 
-    // paginacja
     const pagination = document.getElementById('roomsPagination');
     pagination.innerHTML='';
     const totalPages = Math.ceil(allRooms.length/roomsPerPage);
@@ -210,7 +262,7 @@ async function addRooms(){
     loadRooms(currentRoomPage);
 }
 
-// Użytkownicy
+// --- Użytkownicy ---
 async function loadUsers(){
     const res = await fetch('/api/users');
     if(res.status===401){ window.location.href='/'; return; }
@@ -284,7 +336,7 @@ async function deleteUser(id){
     else showToast('Błąd przy usuwaniu.');
 }
 
-// Logi
+// --- Logi ---
 async function loadLogs(page=1){
   const res = await fetch('/api/logs');
   if(res.status===401){ window.location.href='/'; return; }
@@ -334,6 +386,7 @@ function renderLogs(page=1){
   }
 }
 
+// --- Priorytet pokoju ---
 async function PrioritizeRoom(id){
     const res = await fetch(`/api/room/${id}/priority`, {method:'PUT'});
     if(res.ok){
@@ -344,8 +397,70 @@ async function PrioritizeRoom(id){
     }
 }
 
-// Inicjalizacja
-showView('rooms'); // domyślnie widok pokoi
+// --- Zgłoszenia ---
+async function loadAdminTickets(){
+    const res = await fetch('/api/tickets');
+    const tickets = await res.json();
+    const div = document.getElementById('ticketsAdminList');
+    div.innerHTML='';
+    tickets.forEach(t=>{
+        const ticketDiv = document.createElement('div');
+        ticketDiv.innerHTML = `<strong>${t.username}</strong> - Pokój ${t.room_number} | Status: ${t.status} 
+        <button onclick="openChat(${t.id})">Czat</button>`;
+        div.appendChild(ticketDiv);
+    });
+}
+
+// --- Chat ---
+async function openChat(ticketId){
+    currentTicketId = ticketId;
+    document.getElementById('chatSection').style.display='flex';
+    loadChat();
+}
+
+function closeChat(){
+    document.getElementById('chatSection').style.display='none';
+    currentTicketId = null;
+    document.getElementById('chatWindow').innerHTML='';
+    document.getElementById('chatMessage').value='';
+}
+
+async function loadChat(){
+    if(!currentTicketId) return;
+    const res = await fetch(`/api/tickets/${currentTicketId}/messages`);
+    const messages = await res.json();
+    const chatWin = document.getElementById('chatWindow');
+    chatWin.innerHTML = '';
+
+    messages.forEach(m=>{
+        const isAdmin = m.sender === 'admin';
+        msgDiv = document.createElement('div');
+        msgDiv.className = 'message ' + (isAdmin ? 'sent':'received');
+        const sender = isAdmin ? 'TY:' : m.sender;
+        msgDiv.innerHTML = `<strong>${sender}</strong> ${m.message}`;
+        chatWin.appendChild(msgDiv);
+    });
+    chatWin.scrollTop = chatWin.scrollHeight;
+}
+
+
+
+async function sendChatMessage(){
+    const msgInput = document.getElementById('chatMessage');
+    const message = msgInput.value.trim();
+    if(!message || !currentTicketId) return;
+    await fetch(`/api/tickets/${currentTicketId}/messages`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({message})
+    });
+    msgInput.value='';
+    loadChat();
+}
+
+// --- Inicjalizacja ---
+loadAdminTickets();
+showView('rooms');
 loadRooms();
 loadUsers();
 loadLogs();

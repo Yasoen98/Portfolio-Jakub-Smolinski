@@ -4,60 +4,60 @@
 <meta charset="UTF-8">
 <title>Panel Użytkownika - Pokoje</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-<style>
-/* Licznik pokoi do sprzątania */
-#editCounter {
-    position: fixed;
-    bottom: 90px;
-    right: 30px;
-    color: white;
-    border-radius: 50%;
-    width: 36px;
-    height: 36px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: bold;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-    transition: 0.3s;
-    background: #27ae60;
-}
-
-/* Tryb edycji - brudne pokoje */
-.room-card.editable { border: 2px dashed #e67e22; }
-
-/* Toast */
-#toast {
-    visibility: hidden;
-    min-width: 200px;
-    background-color: #333;
-    color: #fff;
-    text-align: center;
-    border-radius: 5px;
-    padding: 10px;
-    position: fixed;
-    bottom: 30px;
-    right: 30px;
-    z-index: 1000;
-    opacity: 0;
-    transition: opacity 0.5s, visibility 0.5s;
-}
-#toast.show { visibility: visible; opacity: 1; }
-</style>
 </head>
 <body>
 <div class="container">
     <div class="main-container">
+        <!-- Sidebar -->
         <div class="sidebar">
-            <h3>Menu</h3>
-                <div class="bottom-section">
-        <button onclick="logout()">Wyloguj</button>
-    </div>
+            <div class="top-section menu-buttons">
+                <button onclick="showSection('rooms')" class="active">Lista Pokoi</button>
+                <button onclick="showSection('tickets')">Zgłoszenia</button>
+            </div>
+            <div class="bottom-section">
+                <button onclick="logout()">Wyloguj</button>
+            </div>
         </div>
+
+        <!-- Content -->
         <div class="content">
-            <h2>Lista Pokoi</h2>
-            <div id="roomsGrid" class="room-grid"></div>
-            <div id="roomsPagination" class="pagination"></div>
+            <!-- Lista Pokoi -->
+            <div id="rooms" class="section">
+                <h2>Lista Pokoi</h2>
+                <div id="roomsGrid" class="room-grid"></div>
+                <div id="roomsPagination" class="pagination"></div>
+            </div>
+
+        <!-- Zgłoszenia -->
+        <div id="tickets" class="section" style="display:none;">
+            <h2>Zgłoszenia</h2>
+            <button id="toggleTicketForm" style="margin-bottom: 25px;">Pokaż formularz zgłoszenia</button>
+            <div id="ticketFormContainer" style="display:none;">
+                <form id="ticketForm">
+                    <label>Pokój:</label>
+                    <select id="ticketRoom"></select>
+                    <label>Powód zgłoszenia:</label>
+                    <select id="ticketReason">
+                        <option value="brudny pokój">Brudny pokój</option>
+                        <option value="problem z urządzeniem">Problem z urządzeniem</option>
+                        <option value="inne">Inne</option>
+                    </select>
+                    <input type="text" id="ticketMessage" placeholder="Dodatkowa wiadomość...">
+                    <button type="button" onclick="sendTicket()">Wyślij zgłoszenie</button>
+                </form>
+            </div>
+            <div id="ticketsList"></div>
+
+            <!-- Osadzony czat -->
+            <div id="chatSection" class="chat-window" style="display:none; position:relative;">
+                <button class="close-chat" onclick="closeChat()">✖</button>
+                <div id="chatWindow" class="chat-messages"></div>
+                <div class="chat-input">
+                    <input type="text" id="chatMessage" placeholder="Napisz wiadomość...">
+                    <button onclick="sendChatMessage()">Wyślij</button>
+                </div>
+            </div>
+        </div>
         </div>
     </div>
 </div>
@@ -66,7 +66,6 @@
 <button id="editToggle">🧹</button>
 <!-- Licznik pokoi do sprzątania -->
 <div id="editCounter">0</div>
-
 <div id="toast"></div>
 
 <script>
@@ -74,6 +73,15 @@ let currentRoomPage = 1;
 const roomsPerPage = 12;
 let allRooms = [];
 let editMode = false;
+let currentTicketId = null;
+
+// Sidebar
+function showSection(sectionId){
+    document.querySelectorAll('.section').forEach(s=>s.style.display='none');
+    document.getElementById(sectionId).style.display='block';
+    document.querySelectorAll('.menu-buttons button').forEach(b=>b.classList.remove('active'));
+    event.target.classList.add('active');
+}
 
 function showToast(msg){
     const toast = document.getElementById('toast');
@@ -86,6 +94,7 @@ function logout(){
     fetch('/logout').then(()=>window.location.href='/');
 }
 
+// Pokoje
 async function loadRooms(){
     const res = await fetch('/api/rooms');
     if(res.status===401){ window.location.href='/'; return; }
@@ -97,8 +106,6 @@ async function loadRooms(){
 
 function renderRooms(page=1){
     currentRoomPage = page;
-
-    // Jeśli editMode, pokazujemy tylko dirty pokoje, inaczej wszystkie
     let filtered = allRooms.filter(r => editMode ? r.status==='dirty' : true);
 
     const start = (page-1)*roomsPerPage;
@@ -114,11 +121,11 @@ function renderRooms(page=1){
         card.innerHTML = `
             <h3>${r.priority==1 ? '⚠️ Pokój '+r.number+' ⚠️' : 'Pokój '+r.number}</h3>
             <p>Typ: ${r.type}</p>
-<select onchange="changeStatus(${r.id}, this.value)" ${r.status==='occupied' ? 'disabled' : ''}>
-    <option value="clean" ${r.status==='clean'?'selected':''}>Clean</option>
-    <option value="dirty" ${r.status==='dirty'?'selected':''}>Dirty</option>
-    <option value="occupied" disabled ${r.status==='occupied'?'selected':''}>Occupied</option>
-</select>
+            <select onchange="changeStatus(${r.id}, this.value)" ${r.status==='occupied' ? 'disabled' : ''}>
+                <option value="clean" ${r.status==='clean'?'selected':''}>Clean</option>
+                <option value="dirty" ${r.status==='dirty'?'selected':''}>Dirty</option>
+                <option value="occupied" disabled ${r.status==='occupied'?'selected':''}>Occupied</option>
+            </select>
         `;
         grid.appendChild(card);
     });
@@ -138,7 +145,6 @@ function renderRooms(page=1){
     updateEditCounter();
 }
 
-// Zmiana statusu pokoju (tylko dirty → clean dla usera)
 async function changeStatus(id, newStatus){
     const res = await fetch(`/api/room/${id}`, {
         method:'PUT',
@@ -154,21 +160,114 @@ async function changeStatus(id, newStatus){
     }
 }
 
-// Guzik trybu edycji
 document.getElementById('editToggle').addEventListener('click', ()=>{
     editMode = !editMode;
     renderRooms(1);
 });
 
-// Licznik pokoi do sprzątania
 function updateEditCounter(){
     const count = allRooms.filter(r=>r.status==='dirty').length;
     const counter = document.getElementById('editCounter');
     counter.textContent = count;
     counter.style.background = count>0 ? '#e67e22' : '#27ae60';
 }
+// Rozwijanie formularza zgłoszenia
+document.getElementById('toggleTicketForm').addEventListener('click', () => {
+    const container = document.getElementById('ticketFormContainer');
+    if (container.style.display === 'none') {
+        container.style.display = 'block';
+        document.getElementById('toggleTicketForm').textContent = 'Ukryj formularz zgłoszenia';
+    } else {
+        container.style.display = 'none';
+        document.getElementById('toggleTicketForm').textContent = 'Pokaż formularz zgłoszenia';
+    }
+});
+// Zgłoszenia
+async function loadRoomsForTicket(){
+    const res = await fetch('/api/rooms');
+    const rooms = await res.json();
+    const sel = document.getElementById('ticketRoom');
+    sel.innerHTML='';
+    rooms.forEach(r=>{
+        sel.innerHTML += `<option value="${r.id}">${r.number}</option>`;
+    });
+}
 
+async function sendTicket(){
+    const room_id = document.getElementById('ticketRoom').value;
+    const reason = document.getElementById('ticketReason').value;
+    const msg = document.getElementById('ticketMessage').value || reason;
+
+    const res = await fetch('/api/tickets', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({room_id, reason: msg})
+    });
+    if(res.ok){ showToast('Zgłoszenie wysłane!'); loadTickets(); }
+    else { showToast('Błąd przy wysyłaniu zgłoszenia'); }
+}
+
+async function loadTickets(){
+    const res = await fetch('/api/tickets');
+    const tickets = await res.json();
+    const div = document.getElementById('ticketsList');
+    div.innerHTML = '';
+    tickets.forEach(t=>{
+        div.innerHTML += `<div class="ticket-card">
+            <strong>Pokój ${t.room_number}</strong> | Status: ${t.status} | Utworzono: ${t.created_at}
+            <button onclick="openChat(${t.id})">Czat</button>
+        </div>`;
+    });
+}
+
+async function openChat(ticket_id){
+    currentTicketId = ticket_id;
+    document.getElementById('chatSection').style.display='flex';
+    loadChat();
+}
+
+async function loadChat(){
+    if(!currentTicketId) return;
+    const res = await fetch(`/api/tickets/${currentTicketId}/messages`);
+    const messages = await res.json();
+    const chatWin = document.getElementById('chatWindow');
+    chatWin.innerHTML = '';
+    messages.forEach(m=>{
+        const msgDiv = document.createElement('div');
+        msgDiv.className = 'message ' + (m.sender==='user' ? 'sent' : 'received');
+        // Wyświetlamy kto wysłał wiadomość
+        const sender = m.sender==='user' ? 'Ty' : 'Support';
+        msgDiv.innerHTML = `<strong>${sender}:</strong> ${m.message}`;
+        chatWin.appendChild(msgDiv);
+    });
+    chatWin.scrollTop = chatWin.scrollHeight;
+}
+
+// Funkcja zamykania czatu
+function closeChat(){
+    document.getElementById('chatSection').style.display='none';
+    currentTicketId = null;
+}
+
+async function sendChatMessage(){
+    const msgInput = document.getElementById('chatMessage');
+    const msg = msgInput.value.trim();
+    if(!msg) return;
+    await fetch(`/api/tickets/${currentTicketId}/messages`, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({message: msg})
+    });
+    msgInput.value='';
+    loadChat();
+}
+
+setInterval(()=>{ if(currentTicketId) loadChat(); },2000);
+
+// Inicjalizacja
 loadRooms();
+loadRoomsForTicket();
+loadTickets();
 </script>
 </body>
 </html>

@@ -74,7 +74,28 @@ def init_db():
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
-
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS tickets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            room_id INTEGER,
+            reason TEXT,
+            status TEXT DEFAULT 'open',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id),
+            FOREIGN KEY (room_id) REFERENCES rooms(id)
+        )
+    ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS ticket_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ticket_id INTEGER,
+            sender TEXT,
+            message TEXT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (ticket_id) REFERENCES tickets(id)
+        )
+    ''')
     conn.commit()
     conn.close()
 
@@ -400,6 +421,105 @@ def toggle_priority(room_id):
     conn.close()
     log_action(session['user_id'], 'update_priority', room_id, f"Priority set to {new_priority}")
     return jsonify({'success': True, 'priority': new_priority})
+
+# User tworzy nowe zgłoszenie
+@app.route('/api/tickets', methods=['POST'])
+def create_ticket():
+    if 'user_id' not in session:
+        return jsonify({'error':'Unauthorized'}), 401
+    
+    data = request.json
+    room_id = data.get('room_id')
+    reason = data.get('reason')
+    
+    if not room_id or not reason:
+        return jsonify({'error':'Missing fields'}), 400
+
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO tickets (user_id, room_id, reason) VALUES (?, ?, ?)",
+                   (session['user_id'], room_id, reason))
+    ticket_id = cursor.lastrowid
+    cursor.execute("INSERT INTO ticket_messages (ticket_id, sender, message) VALUES (?, ?, ?)",
+                   (ticket_id, 'user', reason))
+    conn.commit()
+    conn.close()
+    log_action(session['user_id'], 'create_ticket', room_id, f"Reason: {reason}")
+    return jsonify({'success': True, 'ticket_id': ticket_id})
+
+# Pobranie zgłoszeń (dla admina)
+@app.route('/api/tickets', methods=['GET'])
+def get_tickets():
+    if 'user_id' not in session:
+        return jsonify({'error':'Unauthorized'}), 401
+    role = session.get('role')
+    
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    if role == 'admin':
+        cursor.execute('''
+            SELECT t.id, t.room_id, r.number, t.status, u.username, t.created_at
+            FROM tickets t
+            JOIN users u ON t.user_id = u.id
+            JOIN rooms r ON t.room_id = r.id
+            ORDER BY t.created_at DESC
+        ''')
+    else:
+        cursor.execute('''
+            SELECT t.id, t.room_id, r.number, t.status, u.username, t.created_at
+            FROM tickets t
+            JOIN users u ON t.user_id = u.id
+            JOIN rooms r ON t.room_id = r.id
+            WHERE t.user_id = ?
+            ORDER BY t.created_at DESC
+        ''', (session['user_id'],))
+    tickets = cursor.fetchall()
+    conn.close()
+
+    return jsonify([{'id': t[0], 'room_id': t[1], 'room_number': t[2], 'status': t[3],
+                     'username': t[4], 'created_at': t[5]} for t in tickets])
+
+# Wiadomości w danym zgłoszeniu
+@app.route('/api/tickets/<int:ticket_id>/messages', methods=['GET'])
+def get_ticket_messages(ticket_id):
+    if 'user_id' not in session:
+        return jsonify({'error':'Unauthorized'}), 401
+    
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    # Zwracamy faktyczną nazwę nadawcy
+    cursor.execute("""
+        SELECT sender, message, timestamp 
+        FROM ticket_messages 
+        WHERE ticket_id=? 
+        ORDER BY timestamp ASC
+    """, (ticket_id,))
+    messages = cursor.fetchall()
+    conn.close()
+    return jsonify([{'sender': m[0], 'message': m[1], 'timestamp': m[2]} for m in messages])
+
+
+# Wysłanie wiadomości w zgłoszeniu
+@app.route('/api/tickets/<int:ticket_id>/messages', methods=['POST'])
+def send_ticket_message(ticket_id):
+    if 'user_id' not in session:
+        return jsonify({'error':'Unauthorized'}), 401
+    
+    data = request.json
+    message = data.get('message')
+    if not message:
+        return jsonify({'error':'Missing message'}), 400
+    
+    # Pobierz imię nadawcy
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT username FROM users WHERE id=?", (session['user_id'],))
+    sender_name = cursor.fetchone()[0]  # faktyczna nazwa użytkownika
+    cursor.execute("INSERT INTO ticket_messages (ticket_id, sender, message) VALUES (?, ?, ?)",
+                   (ticket_id, sender_name, message))
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True})
 
 if __name__ == '__main__':
     app.run(debug=True)
