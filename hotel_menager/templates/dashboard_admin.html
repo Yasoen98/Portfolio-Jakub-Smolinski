@@ -120,7 +120,10 @@
             <!-- Zgłoszenia i czat -->
             <div id="ticketsSection" style="display:none;">
                 <h2>Zgłoszenia od użytkowników</h2>
-                <div id="ticketsAdminList"></div>
+                <div id="ticketsAdminList"></div> <!-- pozostaje lista zgłoszeń -->
+
+                <!-- Kontener dla wszystkich czatów -->
+                <div id="activeChats" class="chat-container"></div>
 
                 <!-- Osadzony czat -->
                 <div id="chatSection" class="chat-window" style="display:none;">
@@ -153,7 +156,6 @@ const roomsPerPage = 15;
 let allRooms = [];
 let editMode = false;
 
-let currentTicketId = null;
 
 // --- TOAST ---
 function showToast(message){
@@ -398,64 +400,107 @@ async function PrioritizeRoom(id){
 }
 
 // --- Zgłoszenia ---
+const sessionUsername = "{{ session['username'] }}";
 async function loadAdminTickets(){
     const res = await fetch('/api/tickets');
     const tickets = await res.json();
     const div = document.getElementById('ticketsAdminList');
     div.innerHTML='';
-    tickets.forEach(t=>{
-        const ticketDiv = document.createElement('div');
-        ticketDiv.innerHTML = `<strong>${t.username}</strong> - Pokój ${t.room_number} | Status: ${t.status} 
-        <button onclick="openChat(${t.id})">Czat</button>`;
-        div.appendChild(ticketDiv);
-    });
+
+tickets.forEach(t=>{
+    const ticketDiv = document.createElement('div');
+    ticketDiv.innerHTML = `<strong>Zgłoszenie od: ${t.username}</strong> - Pokój ${t.room_number} | Status: ${t.status} 
+        <button onclick="openChat(${t.id}, '${t.reason}')">Czat</button>
+        ${t.status !== 'closed' ? `<button onclick="closeTicket(${t.id})" class="close-btn">Zamknij</button>` 
+                                 : `<button onclick="deleteTicket(${t.id})" class="delete-btn">Usuń</button>`}`;
+    document.getElementById('ticketsAdminList').appendChild(ticketDiv);
+});
+}
+
+// Funkcja zamykania zgłoszenia
+async function closeTicket(ticketId){
+    if(!confirm('Na pewno zamknąć zgłoszenie?')) return;
+    const res = await fetch(`/api/tickets/${ticketId}/close`, { method:'PUT' });
+    if(res.ok){
+        showToast('Zgłoszenie zamknięte!');
+        loadAdminTickets();
+    }else{
+        const err = await res.json();
+        showToast(err.error || 'Błąd przy zamykaniu zgłoszenia.');
+    }
 }
 
 // --- Chat ---
-async function openChat(ticketId){
-    currentTicketId = ticketId;
-    document.getElementById('chatSection').style.display='flex';
-    loadChat();
+async function openChat(ticketId, reason){
+    // Sprawdź, czy czat już istnieje
+    if (document.getElementById(`chatSection-${ticketId}`)) return;
+
+    const chatDiv = document.createElement('div');
+    chatDiv.id = `chatSection-${ticketId}`;
+    chatDiv.className = 'chat-window';
+    chatDiv.innerHTML = `
+        <div class="chat-header">
+            <strong>Zgłoszenie: ${reason}</strong>
+            <button class="close-chat" onclick="closeChat(${ticketId})">✖</button>
+        </div>
+        <div id="chatWindow-${ticketId}" class="chat-messages"></div>
+        <div class="chat-input">
+            <input type="text" id="chatMessage-${ticketId}" placeholder="Napisz wiadomość...">
+            <button onclick="sendChatMessage(${ticketId})">Wyślij</button>
+        </div>
+    `;
+
+    document.getElementById('activeChats').appendChild(chatDiv);
+    loadChat(ticketId);
 }
 
-function closeChat(){
-    document.getElementById('chatSection').style.display='none';
-    currentTicketId = null;
-    document.getElementById('chatWindow').innerHTML='';
-    document.getElementById('chatMessage').value='';
+
+function closeChat(ticketId) {
+    const chatDiv = document.getElementById(`chatSection-${ticketId}`);
+    if (chatDiv) chatDiv.remove();
 }
 
-async function loadChat(){
-    if(!currentTicketId) return;
-    const res = await fetch(`/api/tickets/${currentTicketId}/messages`);
+async function loadChat(ticketId){
+    const res = await fetch(`/api/tickets/${ticketId}/messages`);
     const messages = await res.json();
-    const chatWin = document.getElementById('chatWindow');
+    const chatWin = document.getElementById(`chatWindow-${ticketId}`);
     chatWin.innerHTML = '';
 
     messages.forEach(m=>{
-        const isAdmin = m.sender === 'admin';
-        msgDiv = document.createElement('div');
+        const isAdmin = m.sender === sessionUsername;
+        const msgDiv = document.createElement('div');
         msgDiv.className = 'message ' + (isAdmin ? 'sent':'received');
-        const sender = isAdmin ? 'TY:' : m.sender;
-        msgDiv.innerHTML = `<strong>${sender}</strong> ${m.message}`;
+        msgDiv.innerHTML = `<strong>${m.sender}:</strong> ${m.message}`;
         chatWin.appendChild(msgDiv);
     });
+
     chatWin.scrollTop = chatWin.scrollHeight;
 }
 
-
-
-async function sendChatMessage(){
-    const msgInput = document.getElementById('chatMessage');
+async function sendChatMessage(ticketId){
+    const msgInput = document.getElementById(`chatMessage-${ticketId}`);
     const message = msgInput.value.trim();
-    if(!message || !currentTicketId) return;
-    await fetch(`/api/tickets/${currentTicketId}/messages`,{
+    if(!message) return;
+
+    await fetch(`/api/tickets/${ticketId}/messages`,{
         method:'POST',
         headers:{'Content-Type':'application/json'},
         body: JSON.stringify({message})
     });
     msgInput.value='';
-    loadChat();
+    loadChat(ticketId);
+}
+
+async function deleteTicket(ticketId){
+    if(!confirm('Na pewno usunąć to zamknięte zgłoszenie?')) return;
+    const res = await fetch(`/api/tickets/${ticketId}`, { method:'DELETE' });
+    if(res.ok){
+        showToast('Zgłoszenie usunięte!');
+        loadAdminTickets();
+    }else{
+        const err = await res.json();
+        showToast(err.error || 'Błąd przy usuwaniu zgłoszenia.');
+    }
 }
 
 // --- Inicjalizacja ---

@@ -212,7 +212,11 @@ async function loadTickets(){
     const tickets = await res.json();
     const div = document.getElementById('ticketsList');
     div.innerHTML = '';
-    tickets.forEach(t=>{
+
+    // Filtrowanie tylko otwartych zgłoszeń
+    const openTickets = tickets.filter(t => t.status === 'open');
+
+    openTickets.forEach(t=>{
         div.innerHTML += `<div class="ticket-card">
             <strong>Pokój ${t.room_number}</strong> | Status: ${t.status} | Utworzono: ${t.created_at}
             <button onclick="openChat(${t.id})">Czat</button>

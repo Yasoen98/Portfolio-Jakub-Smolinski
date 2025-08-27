@@ -435,30 +435,42 @@ def create_ticket():
     if not room_id or not reason:
         return jsonify({'error':'Missing fields'}), 400
 
+    user_id = session['user_id']
+
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
+
+    # Tworzymy zgłoszenie
     cursor.execute("INSERT INTO tickets (user_id, room_id, reason) VALUES (?, ?, ?)",
-                   (session['user_id'], room_id, reason))
+                   (user_id, room_id, reason))
     ticket_id = cursor.lastrowid
+
+    # Pobieramy username z bazy
+    cursor.execute("SELECT username FROM users WHERE id = ?", (user_id,))
+    username = cursor.fetchone()[0]
+
+    # Dodajemy wiadomość
     cursor.execute("INSERT INTO ticket_messages (ticket_id, sender, message) VALUES (?, ?, ?)",
-                   (ticket_id, 'user', reason))
+                   (ticket_id, username, reason))
     conn.commit()
     conn.close()
-    log_action(session['user_id'], 'create_ticket', room_id, f"Reason: {reason}")
+
+    log_action(user_id, 'create_ticket', room_id, f"Reason: {reason}")
     return jsonify({'success': True, 'ticket_id': ticket_id})
 
-# Pobranie zgłoszeń (dla admina)
+# Pobranie zgłoszeń
 @app.route('/api/tickets', methods=['GET'])
 def get_tickets():
     if 'user_id' not in session:
         return jsonify({'error':'Unauthorized'}), 401
-    role = session.get('role')
     
+    role = session.get('role')
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
+    
     if role == 'admin':
         cursor.execute('''
-            SELECT t.id, t.room_id, r.number, t.status, u.username, t.created_at
+            SELECT t.id, t.room_id, r.number, t.status, u.username, t.created_at, t.reason
             FROM tickets t
             JOIN users u ON t.user_id = u.id
             JOIN rooms r ON t.room_id = r.id
@@ -466,18 +478,28 @@ def get_tickets():
         ''')
     else:
         cursor.execute('''
-            SELECT t.id, t.room_id, r.number, t.status, u.username, t.created_at
+            SELECT t.id, t.room_id, r.number, t.status, u.username, t.created_at, t.reason
             FROM tickets t
             JOIN users u ON t.user_id = u.id
             JOIN rooms r ON t.room_id = r.id
             WHERE t.user_id = ?
             ORDER BY t.created_at DESC
         ''', (session['user_id'],))
+    
     tickets = cursor.fetchall()
     conn.close()
 
-    return jsonify([{'id': t[0], 'room_id': t[1], 'room_number': t[2], 'status': t[3],
-                     'username': t[4], 'created_at': t[5]} for t in tickets])
+    return jsonify([
+        {
+            'id': t[0],
+            'room_id': t[1],
+            'room_number': t[2],
+            'status': t[3],
+            'username': t[4],
+            'created_at': t[5],
+            'reason': t[6]
+        } for t in tickets
+    ])
 
 # Wiadomości w danym zgłoszeniu
 @app.route('/api/tickets/<int:ticket_id>/messages', methods=['GET'])
@@ -520,6 +542,59 @@ def send_ticket_message(ticket_id):
     conn.commit()
     conn.close()
     return jsonify({'success': True})
+
+# API do zamykania zgłoszenia (tylko admin)
+@app.route('/api/tickets/<int:ticket_id>/close', methods=['PUT'])
+def close_ticket(ticket_id):
+    if 'user_id' not in session or session.get('role') != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT status FROM tickets WHERE id = ?", (ticket_id,))
+    current_status = cursor.fetchone()
+    
+    if not current_status:
+        conn.close()
+        return jsonify({'error': 'Ticket not found'}), 404
+    
+    if current_status[0] == 'closed':
+        conn.close()
+        return jsonify({'error': 'Ticket already closed'}), 400
+    
+    cursor.execute("UPDATE tickets SET status = 'closed' WHERE id = ?", (ticket_id,))
+    conn.commit()
+    conn.close()
+    log_action(session['user_id'], 'close_ticket', details=f"Closed ticket ID {ticket_id}")
+    return jsonify({'success': True})
+
+# API do usuwania zamkniętego zgłoszenia (tylko admin)
+@app.route('/api/tickets/<int:ticket_id>', methods=['DELETE'])
+def delete_ticket(ticket_id):
+    if 'user_id' not in session or session.get('role') != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT status FROM tickets WHERE id = ?", (ticket_id,))
+    ticket = cursor.fetchone()
+    
+    if not ticket:
+        conn.close()
+        return jsonify({'error': 'Ticket not found'}), 404
+    
+    if ticket[0] != 'closed':
+        conn.close()
+        return jsonify({'error': 'Only closed tickets can be deleted'}), 400
+    
+    cursor.execute("DELETE FROM tickets WHERE id = ?", (ticket_id,))
+    cursor.execute("DELETE FROM ticket_messages WHERE ticket_id = ?", (ticket_id,))
+    conn.commit()
+    conn.close()
+    
+    log_action(session['user_id'], 'delete_ticket', details=f"Deleted ticket ID {ticket_id}")
+    return jsonify({'success': True})
+
 
 if __name__ == '__main__':
     app.run(debug=True)
