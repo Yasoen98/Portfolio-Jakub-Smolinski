@@ -116,26 +116,27 @@
                 </table>
                 <div id="logsPagination" class="pagination"></div>
             </div>
-
             <!-- Zgłoszenia i czat -->
             <div id="ticketsSection" style="display:none;">
                 <h2>Zgłoszenia od użytkowników</h2>
-                <div id="ticketsAdminList"></div> <!-- pozostaje lista zgłoszeń -->
-
-                <!-- Kontener dla wszystkich czatów -->
+                 <input type="text" id="ticketSearch" placeholder="Szukaj po autorze lub pokoju..." oninput="applyTicketFilter()">
+                <!-- Tabela zgłoszeń -->
+                <table id="ticketsTable">
+                    <thead>
+                        <tr>
+                            <th>Nr. Pokoju</th>
+                            <th>Status</th>
+                            <th>Data</th>
+                            <th>Autor</th>
+                            <th>Akcje</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+                <div id="ticketsPagination" class="pagination"></div>
+                <!-- Kontener dla czatów -->
                 <div id="activeChats" class="chat-container"></div>
-
-                <!-- Osadzony czat -->
-                <div id="chatSection" class="chat-window" style="display:none;">
-                    <button class="close-chat" onclick="closeChat()">✖</button>
-                    <div id="chatWindow" class="chat-messages"></div>
-                    <div class="chat-input">
-                        <input type="text" id="chatMessage" placeholder="Napisz wiadomość...">
-                        <button onclick="sendChatMessage()">Wyślij</button>
-                    </div>
-                </div>
             </div>
-
         </div>
     </div>
 </div>
@@ -401,21 +402,72 @@ async function PrioritizeRoom(id){
 
 // --- Zgłoszenia ---
 const sessionUsername = "{{ session['username'] }}";
+let currentTicketPage = 1;
+const ticketsPerPage = 10;
+let allTickets = [];
+let ticketSearchTerm = "";
+
 async function loadAdminTickets(){
     const res = await fetch('/api/tickets');
-    const tickets = await res.json();
-    const div = document.getElementById('ticketsAdminList');
-    div.innerHTML='';
-
-tickets.forEach(t=>{
-    const ticketDiv = document.createElement('div');
-    ticketDiv.innerHTML = `<strong>Zgłoszenie od: ${t.username}</strong> - Pokój ${t.room_number} | Status: ${t.status} 
-        <button onclick="openChat(${t.id}, '${t.reason}')">Czat</button>
-        ${t.status !== 'closed' ? `<button onclick="closeTicket(${t.id})" class="close-btn">Zamknij</button>` 
-                                 : `<button onclick="deleteTicket(${t.id})" class="delete-btn">Usuń</button>`}`;
-    document.getElementById('ticketsAdminList').appendChild(ticketDiv);
-});
+    allTickets = await res.json();
+    renderTickets(1);
 }
+
+function applyTicketFilter(){
+    ticketSearchTerm = document.getElementById('ticketSearch').value.toLowerCase();
+    renderTickets(1);
+}
+
+function renderTickets(page=1){
+    currentTicketPage = page;
+
+    // --- filtrowanie ---
+    let filtered = allTickets;
+    if(ticketSearchTerm){
+        filtered = allTickets.filter(t => 
+            (t.username && t.username.toLowerCase().includes(ticketSearchTerm)) ||
+            (t.room_number && t.room_number.toString().includes(ticketSearchTerm))
+        );
+    }
+
+    const start = (page-1)*ticketsPerPage;
+    const end = start+ticketsPerPage;
+    const tickets = filtered.slice(start,end);
+
+    const tbody = document.querySelector('#ticketsTable tbody');
+    tbody.innerHTML = '';
+
+    tickets.forEach(t=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${t.room_number}</td>
+            <td>${t.status}</td>
+            <td>${t.date || '-'}</td>
+            <td>${t.username}</td>
+            <td>
+                <button onclick="openChat(${t.id}, '${t.reason}')">Czat</button>
+                ${t.status !== 'closed' 
+                    ? `<button onclick="closeTicket(${t.id})" class="close-btn">Zamknij</button>` 
+                    : `<button onclick="deleteTicket(${t.id})" class="delete-btn">Usuń</button>`}
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    // --- paginacja ---
+    const pagination = document.getElementById('ticketsPagination');
+    pagination.innerHTML = '';
+    const totalPages = Math.ceil(filtered.length / ticketsPerPage);
+    for(let i=1;i<=totalPages;i++){
+        const btn = document.createElement('button');
+        btn.textContent = i;
+        btn.className = (i===currentTicketPage)?'pageBtn active':'pageBtn';
+        btn.onclick = ()=>renderTickets(i);
+        pagination.appendChild(btn);
+    }
+}
+
+
 
 // Funkcja zamykania zgłoszenia
 async function closeTicket(ticketId){

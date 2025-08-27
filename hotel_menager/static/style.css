@@ -1,21 +1,29 @@
+/* --- Reset / podstawy --- */
+* { box-sizing: border-box; text-align: center; }
 body {
     font-family: Arial, sans-serif;
     margin: 0;
     padding: 0;
-    text-align-last: center;
+    background: #f4f6f8;
+    color: #333;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
+/* --- Layout główny --- */
 .container {
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    min-height: 100vh;
 }
 
 .main-container {
     display: flex;
     flex: 1;
+    gap: 0;
 }
 
+/* --- Sidebar (dokładnie jak w HTML) --- */
 .sidebar {
     width: 200px;
     background: #2c3e50;
@@ -23,16 +31,34 @@ body {
     padding: 20px;
     display: flex;
     flex-direction: column;
-    justify-content: space-between; /* top-section na górze, bottom-section na dole */
+    justify-content: space-between;
 }
 
 .top-section {
     display: flex;
     flex-direction: column;
-    gap: 2px; /* minimalny odstęp między przyciskami */
+    gap: 8px;
 }
 
-/* Styl dla przycisku wyloguj */
+.sidebar h3 {
+    margin: 0 0 10px 0;
+}
+
+.sidebar button {
+    margin: 0;
+    padding: 10px;
+    border: none;
+    cursor: pointer;
+    color: white;
+    background: #34495e;
+    text-align: left;
+    border-radius: 5px;
+    transition: background 0.2s;
+}
+
+.sidebar button:hover { background: #1abc9c; color: white; }
+.sidebar button.active { background: #16a085; }
+
 .sidebar .bottom-section button {
     background: #c0392b;
     color: white;
@@ -43,58 +69,28 @@ body {
     cursor: pointer;
     transition: 0.3s;
 }
+.sidebar .bottom-section button:hover { background: #e74c3c; }
 
-.sidebar .bottom-section button:hover {
-    background: #e74c3c;
-    color: white;
-}
-
-.sidebar h3 {
-    margin-top: 0;
-}
-
-.sidebar button {
-    margin: 0; /* usuwa zbędne przerwy */
-    padding: 10px;
-    border: none;
-    cursor: pointer;
-    color: white;
-    background: #34495e;
-    text-align: left;
-    border-radius: 5px;
-    transition: 0.3s;
-}
-
-.sidebar button.active {
-    background: #16a085;
-}
-
-.sidebar button:hover {
-    background: #1abc9c;
-}
-
+/* --- Content area --- */
 .content {
     flex: 1;
     padding: 20px;
     overflow-y: auto;
 }
 
-#roomsList, #usersSection, #logsSection {
+/* Ukryte sekcje (HTML korzysta z display inline styles, więc to jest dodatkowe zabezpieczenie) */
+#roomsList, #usersSection, #logsSection, #ticketsSection {
     display: none;
-    text-align-last: center;
 }
 
-/* Karty pokoi */
+/* --- Karty pokoi / grid --- */
 .room-grid {
     display: flex;
     flex-wrap: wrap;
     gap: 20px;
 }
 
-.room-grid > * {
-    flex: 1 1 calc(33.333% - 13.33px);
-    box-sizing: border-box;
-}
+.room-grid > * { flex: 1 1 calc(33.333% - 13.33px); box-sizing: border-box; }
 
 .room-card {
     flex: 0 0 calc(33.333% - 20px);
@@ -102,32 +98,25 @@ body {
     border-radius: 10px;
     color: white;
     text-align: center;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-    transition: 0.2s;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.12);
+    transition: transform 0.18s ease;
     position: relative;
 }
 
-.room-card:hover {
-    transform: translateY(-5px);
-}
+.room-card:hover { transform: translateY(-5px); }
 
-.room-card h3, .room-card p {
-    margin: 5px 0;
-}
+.room-card h3, .room-card p { margin: 5px 0; }
 
-.room-card select {
-    margin-top: 10px;
-    padding: 5px;
-    border-radius: 5px;
-    border: none;
-}
+.room-card select { margin-top: 10px; padding: 5px; border-radius: 5px; border: none; }
 
+/* Kolory stanów */
 .room-clean { background: #27ae60; }
 .room-dirty { background: #c0392b; }
 .room-occupied { background: #e67e22; }
 
-/* Krzyżyk do usuwania pokoju */
-.room-card .delete-btn {
+/* Edycja: przyciski widoczne tylko w trybie .editable */
+.room-card .delete-btn,
+.room-card .priority-btn {
     position: absolute;
     top: 8px;
     right: 8px;
@@ -135,30 +124,14 @@ body {
     color: white;
     border: none;
     border-radius: 50%;
-    width: 24px;
-    height: 24px;
-    font-size: 16px;
+    width: 28px;
+    height: 28px;
+    font-size: 14px;
     cursor: pointer;
     display: none;
 }
-
-.room-card.editable .delete-btn { display: block; }
-
-/* Wykrzyknik do dodania priorytetu pokoju */
-.room-card .priority-btn {
-    position: absolute;
-    top: 8px;
-    background: red;
-    color: white;
-    border: none;
-    border-radius: 50%;
-    width: 24px;
-    height: 24px;
-    font-size: 16px;
-    cursor: pointer;
-    display: none;
-}
-
+.room-card .priority-btn { right: 42px; background: #e67e22; }
+.room-card.editable .delete-btn,
 .room-card.editable .priority-btn { display: block; }
 
 /* Formularze */
@@ -167,92 +140,209 @@ form {
     padding: 15px;
     border-radius: 10px;
     margin-bottom: 20px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.06);
 }
 
-form label {
-    display: block;
-    margin-top: 10px;
-    font-weight: bold;
-}
-
+form label { display:block; margin-top:10px; font-weight:600; }
 form input, form select {
-    width: 100%;
-    padding: 8px;
-    margin-top: 5px;
-    border-radius: 5px;
-    border: 1px solid #ccc;
-    box-sizing: border-box;
+    width:100%;
+    padding:8px;
+    margin-top:5px;
+    border-radius:5px;
+    border:1px solid #ccc;
 }
 
-form button {
-    margin-top: 15px;
-    padding: 10px 15px;
-    background: #16a085;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: 0.3s;
-    text-align-last: center;
-}
-
-form button:hover { background: #1abc9c; }
-
-/* Tabele */
-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 10px;
-    background: white;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    border-radius: 5px;
-    overflow: hidden;
-}
-
-table th, table td {
-    padding: 10px;
-    text-align: left;
-    border-bottom: 1px solid #ddd;
-}
-
-table th { background: #f4f4f4; }
-
-table tr:hover { background: #f1f1f1; }
-
+/* Buttons (global) */
 button {
     cursor: pointer;
     border-radius: 5px;
-    padding: 5px 8px;
+    padding: 6px 10px;
     border: none;
     background: #3498db;
     color: white;
-    transition: 0.3s;
+    transition: background 0.18s;
 }
-
 button:hover { background: #2980b9; }
 
-/* Paginacja logów i pokoi */
-.pagination {
+/* --- Tabele: logs, tickets i users - identyczny wygląd --- */
+.styled-table,
+#logsTable,
+#ticketsTable,
+#usersTable {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
     margin-top: 10px;
-    place-self: center;
+    background: #ffffff;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.12);
+    border-radius: 8px;
+    overflow: hidden;
+    font-size: 14px;
+}
+
+.styled-table th,
+.styled-table td,
+#logsTable th, #logsTable td,
+#ticketsTable th, #ticketsTable td,
+#usersTable th, #usersTable td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid #e6e6e6;
+}
+
+.styled-table th,
+#logsTable th, #ticketsTable th, #usersTable th {
+    background: #2c3e50;
+    color: white;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-size: 13px;
+}
+
+.styled-table tbody tr:nth-child(even),
+#logsTable tbody tr:nth-child(even),
+#ticketsTable tbody tr:nth-child(even),
+#usersTable tbody tr:nth-child(even) {
+    background: #fafafa;
+}
+
+.styled-table tbody tr:hover,
+#logsTable tbody tr:hover,
+#ticketsTable tbody tr:hover,
+#usersTable tbody tr:hover {
+    background: #d0f0eb;
+    transition: background 0.15s;
+}
+
+/* --- Paginacja (używana w logs i tickets) --- */
+.pagination {
+    margin-top: 12px;
+    display: flex;
+    justify-content: center;
+    gap: 6px;
 }
 
 .pageBtn {
-    padding: 5px 10px;
-    margin: 0 3px;
+    padding: 6px 10px;
     border: none;
     border-radius: 5px;
     background: #3498db;
     color: white;
     cursor: pointer;
-    transition: 0.3s;
+    transition: background 0.14s;
 }
-
 .pageBtn:hover { background: #2980b9; }
 .pageBtn.active { background: #16a085; cursor: default; }
 
-/* Guzik trybu edycji */
+/* --- Wyszukiwarki (logs / tickets) --- */
+#logSearch, #ticketSearch {
+    width: 100%;
+    padding: 9px 12px;
+    margin: 10px 0 6px 0;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 14px;
+    background: white;
+}
+
+/* --- Przyciski akcji w tabelach --- */
+button.close-btn {
+    background: #e74c3c;
+    color: white;
+    padding: 6px 10px;
+    border-radius: 4px;
+    border: none;
+}
+button.close-btn:hover { background: #c0392b; }
+
+#ticketsAdminList .delete-btn,
+button.delete-btn {
+    background: #9b59b6;
+    color: white;
+    padding: 6px 10px;
+    border-radius: 4px;
+    border: none;
+}
+#ticketsAdminList .delete-btn:hover,
+button.delete-btn:hover { background: #8e44ad; }
+
+/* --- Chat --- */
+.chat-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 12px;
+}
+
+.chat-window {
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    padding: 10px;
+    background: #f9f9f9;
+    width: 300px;
+    max-height: 420px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
+.chat-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #ddd;
+    margin-bottom: 6px;
+    font-weight: 600;
+}
+
+.chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 6px;
+    max-height: 300px;
+}
+
+.message.sent {
+    background: #dcf8c6;
+    text-align: right;
+    padding: 6px 10px;
+    border-radius: 10px;
+    margin: 6px 0;
+    border: 1px solid #34b7f1;
+}
+
+.message.received {
+    background: #fff;
+    text-align: left;
+    padding: 6px 10px;
+    border-radius: 10px;
+    margin: 6px 0;
+}
+
+.chat-input {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.chat-input input {
+    flex: 1;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+}
+
+.chat-input button {
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: none;
+    background: #16a085;
+    color: white;
+}
+
+/* --- Edit toggle button (dolny prawy róg) --- */
 #editToggle {
     position: fixed;
     bottom: 20px;
@@ -265,175 +355,32 @@ button:hover { background: #2980b9; }
     font-size: 24px;
     border: none;
     cursor: pointer;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-    transition: 0.3s;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
 }
 
-#editToggle:hover { background: #1abc9c; }
-
-/* Logi - poprawa przejrzystości */
-#logsTable {
-    width: 100%;
-    border-collapse: separate;
-    border-spacing: 0;
-    margin-top: 10px;
-    background: #ffffff;
-    box-shadow: 0 3px 8px rgba(0,0,0,0.15);
-    border-radius: 8px;
-    overflow: hidden;
-    font-size: 14px;
-}
-
-#logsTable th, #logsTable td {
-    padding: 12px 15px;
-    text-align: left;
-    border-bottom: 1px solid #e0e0e0;
-}
-
-#logsTable th {
-    background: #2c3e50;
+/* --- Toast --- */
+#toast {
+    position: fixed;
+    bottom: 100px;
+    right: 24px;
+    background: rgba(0,0,0,0.85);
     color: white;
-    font-weight: bold;
-    text-transform: uppercase;
+    padding: 10px 14px;
+    border-radius: 6px;
+    display: none;
+    z-index: 9999;
 }
+#toast.show { display: block; animation: toastIn 0.22s ease; }
+@keyframes toastIn { from { transform: translateY(8px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
 
-#logsTable tbody tr:nth-child(even) { background: #f9f9f9; }
-#logsTable tbody tr:hover { background: #d0f0eb; transition: background 0.2s; }
-
-/* Responsywność */
-@media(max-width:900px){.room-card{flex:0 0 calc(50% - 20px);} }
-@media(max-width:600px){.room-card{flex:0 0 100%;}form input,form select{font-size:14px;} }
-
-/* --- Chat Messenger Style --- */
-.chat-window {
-    border:1px solid #ccc;
-    border-radius:10px;
-    padding:10px;
-    background:#f9f9f9;
-    max-width:400px;
-    display:flex;
-    flex-direction:column;
-    place-self: center;
-    margin-top: 30px;
+/* --- Responsywność --- */
+@media (max-width: 900px) {
+    .room-card { flex: 0 0 calc(50% - 20px); }
+    .sidebar { width: 180px; }
 }
-.chat-messages {
-    flex:1;
-    overflow-y:auto;
-    margin-bottom:10px;
-}
-.message.sent { background:#dcf8c6; text-align:right; padding:5px 10px; border-radius:10px; margin:5px 0; }
-.message.received { background:#fff; text-align:left; padding:5px 10px; border-radius:10px; margin:5px 0; }
-.close-chat {
-    position:absolute;
-    top:5px;
-    right:5px;
-    border:none;
-    background:transparent;
-    font-size:16px;
-    cursor:pointer;
-}
-.chat-input { display:flex; gap:5px; }
-
-.chat-input input {
-    flex: 1;
-    padding: 10px;
-    border: none;
-    border-radius: 0;
-    font-size: 14px;
-}
-
-.chat-input button {
-    padding: 10px 15px;
-    background: #16a085;
-    color: white;
-    border: none;
-    cursor: pointer;
-    transition: 0.3s;
-}
-.chat-container {
-    display: flex;
-    flex-wrap: wrap;      /* czaty przechodzą w dół, jeśli brak miejsca */
-    gap: 10px;            /* odstęp między czatami */
-    margin-top: 10px;     /* odstęp od listy zgłoszeń */
-}
-.chat-window {
-    width: 300px;
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    border:1px solid #ccc;
-    border-radius:10px;
-    background:#f9f9f9;
-    max-height: 400px;
-    position: relative;
-}
-
-.chat-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding-bottom: 5px;
-    border-bottom: 1px solid #ccc;
-    margin-bottom: 5px;
-}
-
-.chat-messages {
-    flex: 1;
-    overflow-y: auto;
-    padding: 5px;
-    max-height: 300px;
-}
-
-.message.sent {
-    background: #dcf8c6;
-    text-align: right;
-    padding: 5px 10px;
-    border-radius: 10px;
-    margin: 5px 0;
-    border: 1px solid #34b7f1; /* wyróżnienie dla admina */
-}
-
-.message.received {
-    background: #fff;
-    text-align: left;
-    padding: 5px 10px;
-    border-radius: 10px;
-    margin: 5px 0;
-}
-
-/* Dodatkowy styl dla kolumny Akcje (np. przycisk Zamknij) */
-#ticketsTable td button.close-btn {
-    background: #c0392b;
-    color: white;
-    padding: 5px 10px;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: 0.3s;
-}
-
-#ticketsAdminList .delete-btn {
-    background: #c0392b;
-    color: white;
-    padding: 5px 10px;
-    margin-left: 5px;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: 0.3s;
-}
-
-#ticketsAdminList .delete-btn:hover {
-    background: #e74c3c;
-}
-
-#ticketsTable td button.close-btn:hover {
-    background: #e74c3c;
-}
-.chat-input button:hover { background: #1abc9c; 
-
-
-#ticketsTable td button.close-btn:hover {
-    background: #e74c3c;
-}
+@media (max-width: 600px) {
+    .room-card { flex: 0 0 100%; }
+    .sidebar { width: 100%; position: relative; }
+    .main-container { flex-direction: column; }
+    .chat-window { width: 100%; }
 }

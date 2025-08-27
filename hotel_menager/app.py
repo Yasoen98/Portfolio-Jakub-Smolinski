@@ -595,6 +595,16 @@ def delete_ticket(ticket_id):
     log_action(session['user_id'], 'delete_ticket', details=f"Deleted ticket ID {ticket_id}")
     return jsonify({'success': True})
 
+@app.route('/api/me', methods=['GET'])
+def get_current_user():
+    if 'user_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT username, role FROM users WHERE id=?", (session['user_id'],))
+    user = cursor.fetchone()
+    conn.close()
+    return jsonify({'username': user[0], 'role': user[1]})
 
 if __name__ == '__main__':
     app.run(debug=True)

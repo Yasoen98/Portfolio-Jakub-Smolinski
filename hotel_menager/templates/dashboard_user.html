@@ -74,6 +74,15 @@ const roomsPerPage = 12;
 let allRooms = [];
 let editMode = false;
 let currentTicketId = null;
+let currentUsername = null;
+
+async function loadCurrentUser(){
+    const res = await fetch('/api/me');
+    if(res.ok){
+        const data = await res.json();
+        currentUsername = data.username;
+    }
+}
 
 // Sidebar
 function showSection(sectionId){
@@ -237,15 +246,16 @@ async function loadChat(){
     const chatWin = document.getElementById('chatWindow');
     chatWin.innerHTML = '';
     messages.forEach(m=>{
+        const isMine = (m.sender === currentUsername);
         const msgDiv = document.createElement('div');
-        msgDiv.className = 'message ' + (m.sender==='user' ? 'sent' : 'received');
-        // Wyświetlamy kto wysłał wiadomość
-        const sender = m.sender==='user' ? 'Ty' : 'Support';
+        msgDiv.className = 'message ' + (isMine ? 'sent' : 'received');
+        const sender = isMine ? 'Ty' : m.sender; // pokaż "Ty" dla mnie, nazwę konta dla innych
         msgDiv.innerHTML = `<strong>${sender}:</strong> ${m.message}`;
         chatWin.appendChild(msgDiv);
     });
     chatWin.scrollTop = chatWin.scrollHeight;
 }
+
 
 // Funkcja zamykania czatu
 function closeChat(){
