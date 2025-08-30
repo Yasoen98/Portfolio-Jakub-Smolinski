@@ -2,565 +2,751 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<title>Panel Zarządzania Hotelem - Admin</title>
+<title>Panel Zarządzania Hotelem</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 <style>
-/* --- Dodatkowy CSS dla czatu --- */
-.chat-window {
-    border:1px solid #ccc;
-    border-radius:10px;
-    padding:10px;
-    background:#f9f9f9;
-    max-width:400px;
-    display:flex;
-    flex-direction:column;
-    position:relative;
-    margin-top:10px;
-}
-.chat-messages {
-    flex:1;
-    overflow-y:auto;
-    margin-bottom:10px;
-    max-height:300px;
-}
-.message.sent { background:#dcf8c6; text-align:right; padding:5px 10px; border-radius:10px; margin:5px 0; }
-.message.received { background:#fff; text-align:left; padding:5px 10px; border-radius:10px; margin:5px 0; }
-.close-chat {
-    position:absolute;
-    top:5px;
-    right:5px;
-    border:none;
-    background:transparent;
-    font-size:16px;
-    cursor:pointer;
-}
-.chat-input { display:flex; gap:5px; }
-.chat-input input { flex:1; padding:5px; border-radius:5px; border:1px solid #ccc; }
-.chat-input button { padding:5px 10px; border-radius:5px; border:none; background:#007bff; color:white; cursor:pointer; }
+/* Poświaty statusów rezerwacji */
+.res-row.glow-in   { box-shadow: 0 0 0 9999px rgba(25, 190, 94, 0.432) inset; }
+.res-row.glow-out  { box-shadow: 0 0 0 9999px rgba(230, 52, 32, 0.233) inset; }
+#resGuestFilter { padding:8px; border:1px solid #ccc; border-radius:6px; }
+.switch { display:inline-flex; gap:6px; align-items:center; font-size:14px; }
+.hidden { display:none !important; }
+.small { font-size:12px; opacity:.8; }
+
+/* Podgląd gościa na karcie pokoju (jeśli zajęty) */
+.room-card .guest-inline { display:block; margin-top:6px; font-size:13px; background:rgba(255,255,255,.25); padding:4px 8px; border-radius:8px; }
 </style>
 </head>
 <body>
 <div class="container">
-    <div class="main-container">
-        <div class="sidebar">
-            <div class="top-section">
-                <h3>Menu</h3>
-                <button onclick="showView('rooms')" id="roomsBtn" class="active">Lista</button>
-                <button onclick="showView('users')" id="usersBtn">Użytkownicy</button>
-                <button onclick="showView('logs')" id="logsBtn">Logi</button>
-                <button onclick="showView('tickets')" id="ticketsBtn">Zgłoszenia</button>
-            </div>
-            <div class="bottom-section">
-                <button onclick="logout()">Wyloguj</button>
-            </div>
-        </div>
-        <div class="content">
-            <!-- Lista Pokoi -->
-            <div id="roomsList">
-                <h2>Lista Pokoi</h2>
-                <div id="roomsGrid" class="room-grid"></div>
-                <div id="roomsPagination" class="pagination"></div>
-                <!-- Formularz dodawania pokoi -->
-                <form id="addRoomForm" style="display:none;">
-                    <label>Numery pokoi (np. 101;102;103):</label>
-                    <input type="text" id="roomNumbers" required>
-                    <label>Typ pokoju:</label>
-                    <select id="roomType">
-                        <option value="single">Single</option>
-                        <option value="double">Double</option>
-                    </select>
-                    <button type="button" onclick="addRooms()">Dodaj pokoje</button>
-                </form>
-            </div>
-
-            <!-- Użytkownicy -->
-            <div id="usersSection" style="display:none;">
-                <h2>Użytkownicy</h2>
-                <table id="usersTable">
-                    <thead>
-                        <tr><th>ID</th><th>Username</th><th>Rola</th><th>Akcje</th></tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
-                <button id="addUserToggle" class="addUserBtn">Dodaj użytkownika +</button>
-                <form id="addUserForm" style="display:none;">
-                    <label>Username:</label>
-                    <input type="text" id="newUsername" required>
-                    <label>Hasło:</label>
-                    <input type="password" id="newPassword" required>
-                    <label>Rola:</label>
-                    <select id="newRole">
-                        <option value="admin">Admin</option>
-                        <option value="user">User</option>
-                    </select>
-                    <button type="button" onclick="addUser()">Dodaj użytkownika</button>
-                </form>
-            </div>
-
-            <!-- Logi -->
-            <div id="logsSection" style="display:none;">
-                <h2>Logi</h2>
-                <input type="text" id="logSearch" placeholder="Szukaj po użytkowniku..." oninput="applyLogFilter()">
-                <table id="logsTable">
-                    <thead>
-                        <tr>
-                            <th>Data</th>
-                            <th>Czas</th>
-                            <th>Pokój</th>
-                            <th>Użytkownik</th>
-                            <th>Poprzedni stan</th>
-                            <th>Nowy stan</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
-                <div id="logsPagination" class="pagination"></div>
-            </div>
-            <!-- Zgłoszenia i czat -->
-            <div id="ticketsSection" style="display:none;">
-                <h2>Zgłoszenia od użytkowników</h2>
-                 <input type="text" id="ticketSearch" placeholder="Szukaj po autorze lub pokoju..." oninput="applyTicketFilter()">
-                <!-- Tabela zgłoszeń -->
-                <table id="ticketsTable">
-                    <thead>
-                        <tr>
-                            <th>Nr. Pokoju</th>
-                            <th>Status</th>
-                            <th>Data</th>
-                            <th>Autor</th>
-                            <th>Akcje</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
-                <div id="ticketsPagination" class="pagination"></div>
-                <!-- Kontener dla czatów -->
-                <div id="activeChats" class="chat-container"></div>
-            </div>
-        </div>
+  <div class="main-container">
+    <div class="sidebar">
+      <div class="top-section">
+        <h3>Menu</h3>
+        <button onclick="showView('rooms')" id="roomsBtn" class="active">Pokoje</button>
+        <button onclick="showView('reservations')" id="reservationsBtn">Rezerwacje</button>
+        <button onclick="showView('users')" id="usersBtn">Użytkownicy</button>
+        <button onclick="showView('logs')" id="logsBtn">Logi</button>
+        <button onclick="showView('tickets')" id="ticketsBtn">Zgłoszenia</button>
+      </div>
+      <div class="bottom-section">
+        <div class="small" id="whoami"></div>
+        <button onclick="logout()">Wyloguj</button>
+      </div>
     </div>
+
+    <div class="content">
+      <!-- Pokoje -->
+      <div id="roomsList">
+        <h2>Lista Pokoi</h2>
+        <div id="roomsGrid" class="room-grid"></div>
+        <div id="roomsPagination" class="pagination"></div>
+
+        <form id="addRoomForm" class="hidden">
+          <label>Numery pokoi (np. 101;102;103):</label>
+          <input type="text" id="roomNumbers" required>
+          <label>Typ pokoju:</label>
+          <select id="roomType">
+            <option value="single">Single</option>
+            <option value="double">Double</option>
+          </select>
+          <button type="button" onclick="addRooms()">Dodaj pokoje</button>
+        </form>
+      </div>
+
+      <!-- Rezerwacje -->
+<div id="reservationsSection" style="display:none;">
+  <h2>Rezerwacje</h2>
+
+  <!-- Filtr tekstowy (pełna szerokość, jak w logach) -->
+  <div class="list-toolbar" style="margin:8px 0;">
+    <input id="resGuestFilter" placeholder="Szukaj po imieniu/nazwisku..." oninput="renderReservations(1)">
+  </div>
+
+  <!-- Toggle formularza -->
+  <button id="toggleResForm" style="margin:8px 0;">Pokaż formularz rezerwacji</button>
+
+  <!-- Rozwijany formularz -->
+  <div id="resFormContainer" style="display:none;">
+    <form id="reservationForm">
+      <input type="hidden" id="resId">
+      <div class="form-grid">
+        <div>
+          <label>Imię</label>
+          <input id="resFirstName" type="text" required>
+        </div>
+        <div>
+          <label>Nazwisko</label>
+          <input id="resLastName" type="text" required>
+        </div>
+        <div>
+          <label>Check-in</label>
+          <input id="resCheckIn" type="date" required>
+        </div>
+        <div>
+          <label>Check-out</label>
+          <input id="resCheckOut" type="date" required>
+        </div>
+        <!-- Pokój wyśrodkowany -->
+        <div class="centered">
+          <label>Pokój</label>
+          <select id="resRoomId"></select>
+        </div>
+        <div class="full-row">
+          <button type="button" onclick="saveReservation()">Zapisz</button>
+          <button type="button" onclick="resetReservationForm()">Wyczyść</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <table id="reservationsTable" class="styled-table" style="margin-top:10px;">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Gość</th>
+        <th>Pokój</th>
+        <th>Typ</th>
+        <th>Check-in</th>
+        <th>Check-out</th>
+        <th>Status</th>
+        <th>
+          Akcje
+          <!-- Select statusu przeniesiony do nagłówka obok "Akcje" -->
+          <select id="resStatusFilter" onchange="renderReservations(1)" style="margin-right: 30px; float: right;">
+            <option value="">Wszystkie</option>
+            <option value="booked">Oczekujące</option>
+            <option value="checked_in">Aktywne</option>
+            <option value="closed">Zamknięte</option>
+          </select>
+        </th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+  <div id="reservationsPagination" class="pagination"></div>
 </div>
 
-<!-- Guzik trybu edycji -->
+
+      <!-- Użytkownicy -->
+      <div id="usersSection" style="display:none;">
+        <h2>Użytkownicy</h2>
+        <table id="usersTable"><thead>
+          <tr><th>ID</th><th>Username</th><th>Rola</th><th>Akcje</th></tr>
+        </thead><tbody></tbody></table>
+        <button id="addUserToggle" class="addUserBtn" aria-expanded="false">Pokaż formularz</button>
+        <form id="addUserForm" class="hidden">
+          <label>Username:</label>
+          <input type="text" id="newUsername" required>
+          <label>Hasło:</label>
+          <input type="password" id="newPassword" required>
+          <label>Rola:</label>
+          <select id="newRole">
+            <option value="admin">admin</option>
+            <option value="manager">manager</option>
+            <option value="recepcjonista">recepcjonista</option>
+            <option value="housekeeping">housekeeping</option>
+            <option value="user">user</option>
+          </select>
+          <button type="button" onclick="addUser()">Dodaj użytkownika</button>
+        </form>
+      </div>
+
+      <!-- Logi -->
+      <div id="logsSection" style="display:none;">
+        <h2>Logi</h2>
+        <input type="text" id="logSearch" placeholder="Szukaj po użytkowniku..." oninput="applyLogFilter()">
+        <table id="logsTable"><thead>
+          <tr><th>Data</th><th>Czas</th><th>Pokój</th><th>Użytkownik</th><th>Szczegóły</th></tr>
+        </thead><tbody></tbody></table>
+        <div id="logsPagination" class="pagination"></div>
+      </div>
+
+      <!-- Zgłoszenia -->
+      <div id="ticketsSection" style="display:none;">
+        <h2>Zgłoszenia</h2>
+        <input type="text" id="ticketSearch" placeholder="Szukaj po autorze lub pokoju..." oninput="applyTicketFilter()">
+        <table id="ticketsTable"><thead>
+          <tr><th>Nr. Pokoju</th><th>Status</th><th>Data</th><th>Autor</th><th>Akcje</th></tr>
+        </thead><tbody></tbody></table>
+        <div id="ticketsPagination" class="pagination"></div>
+        <div id="activeChats" class="chat-container"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <button id="editToggle">🔧</button>
 <div id="toast"></div>
 
 <script>
-let currentUserId = 1;
-let currentLogPage = 1;
-const logsPerPage = 16;
-let allLogs = [];
-let logSearchTerm = "";
-
-let currentRoomPage = 1;
-const roomsPerPage = 15;
+let currentUser = { id:null, username:null, role:null };
 let allRooms = [];
-let editMode = false;
+let reservations = [];
+let allLogs = [], currentLogPage = 1, logsPerPage = 16, logSearchTerm = "";
+let allTickets = [], currentTicketPage = 1, ticketsPerPage = 10, ticketSearchTerm = "";
+let editMode = false, currentRoomPage = 1, roomsPerPage = 15;
+let currentResPage = 1;
+let resPerPage = 12;
 
+/* ------ helpers ------ */
+function showToast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.className='show'; setTimeout(()=>t.className='',3000); }
 
-// --- TOAST ---
-function showToast(message){
-    const toast = document.getElementById('toast');
-    toast.textContent = message;
-    toast.className = 'show';
-    setTimeout(()=>{ toast.className = toast.className.replace('show',''); },3000);
+function updateAddRoomFormVisibility(){
+  const canAdmin = ['admin','manager'].includes(currentUser.role);
+  const isRoomsView = document.getElementById('roomsList').style.display !== 'none';
+  document.getElementById('addRoomForm')
+    .classList.toggle('hidden', !(canAdmin && editMode && isRoomsView));
 }
 
-// --- Widoki ---
+async function loadMe(){
+  const r = await fetch('/api/me'); if(!r.ok){location.href='/';return;}
+  currentUser = await r.json();
+  document.getElementById('whoami').textContent = `Zalogowano: ${currentUser.username} (${currentUser.role})`;
+  const canAdmin = ['admin','manager'].includes(currentUser.role);
+ updateAddRoomFormVisibility();
+  document.getElementById('usersBtn').classList.toggle('hidden', !canAdmin);
+  document.getElementById('logsBtn').classList.toggle('hidden', !canAdmin);
+}
+function logout(){ fetch('/logout').then(()=>location.href='/'); }
+
+/* ------ views ------ */
 function showView(view){
-    document.getElementById('roomsList').style.display = view==='rooms'?'block':'none';
-    document.getElementById('usersSection').style.display = view==='users'?'block':'none';
-    document.getElementById('logsSection').style.display = view==='logs'?'block':'none';
-    document.getElementById('ticketsSection').style.display = view==='tickets'?'block':'none';
+  const ids=['roomsList','reservationsSection','usersSection','logsSection','ticketsSection'];
+  ids.forEach(id=>document.getElementById(id).style.display =
+    (id=== (view==='rooms'?'roomsList':view==='reservations'?'reservationsSection':view==='users'?'usersSection':view==='logs'?'logsSection':'ticketsSection'))
+      ? 'block' : 'none');
 
-    document.getElementById('roomsBtn').classList.toggle('active', view==='rooms');
-    document.getElementById('usersBtn').classList.toggle('active', view==='users');
-    document.getElementById('logsBtn').classList.toggle('active', view==='logs');
-    document.getElementById('ticketsBtn').classList.toggle('active', view==='tickets');
+  document.getElementById('roomsBtn').classList.toggle('active', view==='rooms');
+  document.getElementById('reservationsBtn').classList.toggle('active', view==='reservations');
+  document.getElementById('usersBtn').classList.toggle('active', view==='users');
+  document.getElementById('logsBtn').classList.toggle('active', view==='logs');
+  document.getElementById('ticketsBtn').classList.toggle('active', view==='tickets');
+
+  if(view==='reservations'){ loadReservations(); loadRoomsForReservations(); }
+  if(view==='tickets'){ loadAdminTickets(); }
+
+  // kluczowe: ładowanie tylko dla admin/manager
+  const canAdmin = ['admin','manager'].includes(currentUser.role);
+  if(view==='users' && canAdmin){ loadUsers(); }
+  if(view==='logs' && canAdmin){ loadLogs(); }
 }
 
-// --- Logout ---
-function logout(){ fetch('/logout').then(()=>window.location.href='/'); }
-
-// --- Pokoje ---
+/* ------ rooms ------ */
 async function loadRooms(page=1){
-    const res = await fetch('/api/rooms');
-    if(res.status===401){ window.location.href='/'; return; }
-    allRooms = await res.json();
-    allRooms.sort((a,b)=>parseInt(a.number)-parseInt(b.number));
-    renderRooms(page);
+  const r = await fetch('/api/rooms'); if(r.status===401){location.href='/'; return;}
+  allRooms = await r.json(); allRooms.sort((a,b)=>parseInt(a.number)-parseInt(b.number)); renderRooms(page);
 }
 
 function renderRooms(page=1){
-    currentRoomPage = page;
-    const start = (page-1)*roomsPerPage;
-    const end = start+roomsPerPage;
-    const rooms = allRooms.slice(start,end);
+  currentRoomPage = page;
+  const start=(page-1)*roomsPerPage, end=start+roomsPerPage, rooms=allRooms.slice(start,end);
+  const grid=document.getElementById('roomsGrid'); grid.innerHTML='';
 
-    const grid = document.getElementById('roomsGrid');
-    grid.innerHTML='';
-    rooms.forEach(room=>{
-        const state = room.status;
-        const card = document.createElement('div');
-        card.className=`room-card room-${state} ${editMode?'editable':''}`;
-        card.innerHTML = `
-            ${editMode ? '<button class="delete-btn" onclick="deleteRoom('+room.id+')">x</button>' : ''}
-            ${editMode ? '<button class="priority-btn" onclick="PrioritizeRoom('+room.id+')">!</button>' : ''}
-            <h3>${room.priority==1 ? '⚠️ Pokój '+room.number+' ⚠️' : 'Pokój '+room.number}</h3>
-            <p>Typ: ${room.type}</p>
-            <select onchange="changeState(${room.id}, this.value)" ${editMode?'disabled':''}>
-              <option value="clean" ${state==='clean'?'selected':''}>Clean</option>
-              <option value="dirty" ${state==='dirty'?'selected':''}>Dirty</option>
-              <option value="occupied" ${state==='occupied'?'selected':''}>Occupied</option>
-            </select>`;
-        grid.appendChild(card);
-    });
+  rooms.forEach(room=>{
+    const g = room.guest_name && room.status==='occupied'
+      ? `<span class="guest-inline">Gość: ${room.guest_name}</span>` : '';
 
-    const pagination = document.getElementById('roomsPagination');
-    pagination.innerHTML='';
-    const totalPages = Math.ceil(allRooms.length/roomsPerPage);
-    for(let i=1;i<=totalPages;i++){
-        const btn = document.createElement('button');
-        btn.textContent=i;
-        btn.className = (i===currentRoomPage)?'pageBtn active':'pageBtn';
-        btn.onclick = ()=>renderRooms(i);
-        pagination.appendChild(btn);
-    }
+    const card=document.createElement('div');
+    card.className=`room-card room-${room.status} ${editMode?'editable':''}`;
+
+    const canManageRooms = ['admin','manager'].includes(currentUser.role);
+    const canPrioritize  = canManageRooms || currentUser.role === 'recepcjonista';
+    const canComment     = canPrioritize; // recepcjonista/manager/admin
+
+    const commentLine = room.comment
+      ? `<div class="guest-inline">Komentarz: ${room.comment}</div>`
+      : '';
+
+    const controls = (editMode && canComment)
+      ? `
+        <input type="text"
+               placeholder="Dodaj komentarz..."
+               onkeydown="handleCommentKey(event, ${room.id})"
+               class="comment-input"
+               style="width:100%;margin-top:8px;padding:6px;border-radius:6px;border:1px solid #ccc;">
+      `
+      : `
+        <select onchange="changeState(${room.id}, this.value)" ${editMode?'disabled':''}>
+          <option value="clean" ${room.status==='clean'?'selected':''}>Clean</option>
+          <option value="dirty" ${room.status==='dirty'?'selected':''}>Dirty</option>
+          <option value="occupied" ${room.status==='occupied'?'selected':''}>Occupied</option>
+        </select>
+      `;
+
+    card.innerHTML = `
+      ${ editMode && canManageRooms ? `<button class="delete-btn" onclick="deleteRoom(${room.id})">x</button>` : '' }
+      ${ editMode && canPrioritize  ? `<button class="priority-btn" onclick="PrioritizeRoom(${room.id})">!</button>` : '' }
+      <h3>${room.priority==1 ? '⚠️ Pokój '+room.number+' ⚠️' : 'Pokój '+room.number}</h3>
+      <p>Typ: ${room.type}</p>
+      ${g}
+      ${commentLine}
+      ${controls}
+    `;
+    grid.appendChild(card);
+  });
+
+  const pagination=document.getElementById('roomsPagination'); pagination.innerHTML='';
+  const totalPages=Math.ceil(allRooms.length/roomsPerPage);
+  for(let i=1;i<=totalPages;i++){
+    const b=document.createElement('button');
+    b.textContent=i;
+    b.className=i===currentRoomPage?'pageBtn active':'pageBtn';
+    b.onclick=()=>renderRooms(i);
+    pagination.appendChild(b);
+  }
 }
 
-async function changeState(id, value){
-    await fetch(`/api/room/${id}`,{
-        method:'PUT',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({status:value})
-    });
-    loadRooms(currentRoomPage);
+async function changeState(id,val){
+  const r = await fetch(`/api/room/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:val})});
+  if(!r.ok){ const e=await r.json().catch(()=>({})); showToast(e.error||'Błąd zmiany statusu'); }
+  loadRooms(currentRoomPage);
+}
+
+async function handleCommentKey(e, roomId){
+  if(e.key !== 'Enter') return;
+  const val = (e.target.value || '').trim();
+  const r = await fetch(`/api/room/${roomId}/comment`, {
+    method:'PUT',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ comment: val })
+  });
+  if(!r.ok){
+    const err = await r.json().catch(()=>({}));
+    showToast(err.error || 'Błąd zapisu komentarza');
+    return;
+  }
+  showToast('Komentarz zapisany');
+  loadRooms(currentRoomPage);
 }
 
 document.getElementById('editToggle').addEventListener('click', ()=>{
-    editMode = !editMode;
-    document.getElementById('addRoomForm').style.display = editMode?'block':'none';
-    renderRooms(currentRoomPage);
+  editMode = !editMode;
+  renderRooms(currentRoomPage);
+  updateAddRoomFormVisibility(); // <- używamy funkcji z kontroczą roli
+});
+async function deleteRoom(id){ if(!confirm('Usunąć pokój?'))return; const r=await fetch(`/api/room/${id}`,{method:'DELETE'}); if(!r.ok){showToast('Błąd usuwania');} loadRooms(currentRoomPage); }
+async function addRooms(){ const nums=document.getElementById('roomNumbers').value.split(';').map(s=>s.trim()).filter(Boolean); const type=document.getElementById('roomType').value; for(const n of nums){await fetch('/api/rooms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({number:n,type})});} showToast('Dodano'); document.getElementById('addRoomForm').reset(); loadRooms(currentRoomPage); }
+async function PrioritizeRoom(id){ const r=await fetch(`/api/room/${id}/priority`,{method:'PUT'}); if(!r.ok){showToast('Błąd priorytetu');} loadRooms(currentRoomPage); }
+
+/* ------ reservations ------ */
+async function loadRoomsForReservations(){
+  const r = await fetch('/api/rooms');
+  const rooms = await r.json();
+  const sel = document.getElementById('resRoomId');
+  sel.innerHTML = '';
+  rooms
+    .filter(x => x.status === 'clean')
+    .forEach(x => sel.innerHTML += `<option value="${x.id}">${x.number} (${x.type})</option>`);
+}
+async function loadReservations(){
+  const r = await fetch('/api/reservations'); if(!r.ok){showToast('Błąd pobierania rezerwacji'); return;}
+  reservations = await r.json(); renderReservations(1);
+}
+function resetReservationForm(){ ['resId','resFirstName','resLastName','resCheckIn','resCheckOut'].forEach(id=>document.getElementById(id).value=''); document.getElementById('resRoomId').selectedIndex=0; }
+function fullGuestName(row){ return [row.guest_first_name||'', row.guest_last_name||''].join(' ').trim(); }
+
+function renderReservations(page = currentResPage){
+  currentResPage = page;
+
+  const tbody = document.querySelector('#reservationsTable tbody');
+  tbody.innerHTML = '';
+
+  const q = (document.getElementById('resGuestFilter')?.value || '').trim().toLowerCase();
+  const statusVal = (document.getElementById('resStatusFilter')?.value || '');
+
+  let list = reservations.slice();
+
+  const fullGuestName = row => [row.guest_first_name||'', row.guest_last_name||''].join(' ').trim();
+  if(q) list = list.filter(r => fullGuestName(r).toLowerCase().includes(q));
+
+  if(statusVal) list = list.filter(r => r.status === statusVal);
+
+  const order = { booked: 0, checked_in: 1, closed: 2 };
+  list.sort((a, b) => {
+    const byStatus = (order[a.status] ?? 99) - (order[b.status] ?? 99);
+    if (byStatus !== 0) return byStatus;
+
+    const byDate = String(a.check_in||'').localeCompare(String(b.check_in||''));
+    if (byDate !== 0) return byDate;
+
+    return (a.id||0) - (b.id||0);
+  });
+
+  const start = (currentResPage - 1) * resPerPage;
+  const end   = start + resPerPage;
+  const pageRows = list.slice(start, end);
+  pageRows.forEach(r=>{
+    const tr = document.createElement('tr');
+    tr.className = 'res-row ' + (r.status==='checked_in' ? 'glow-in' : r.status==='closed' ? 'glow-out' : '');
+    const gName = fullGuestName(r) || '-';
+    const actions = [];
+    if(r.status==='booked'){
+      actions.push(`<button onclick="checkIn(${r.id})">Check-in</button>`);
+      actions.push(`<button class="delete-btn" onclick="deleteReservation(${r.id})">Usuń</button>`);
+      actions.push(`<button onclick="editReservation(${r.id})">Edytuj</button>`);
+    } else if(r.status==='checked_in'){
+      actions.push(`<button onclick="checkOut(${r.id})">Check-out</button>`);
+      actions.push(`<button onclick="editReservation(${r.id})">Edytuj</button>`);
+    }
+    tr.innerHTML = `
+      <td>${r.id}</td>
+      <td>${gName}</td>
+      <td>${r.room_number} <span class="small">(#${r.room_id})</span></td>
+      <td>${r.room_type}</td>
+      <td>${r.check_in}</td>
+      <td>${r.check_out}</td>
+      <td>${r.status}</td>
+      <td>${actions.join(' ')}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+  const pag = document.getElementById('reservationsPagination');
+  if(!pag) return; // w razie gdyby sekcja była ukryta
+  pag.innerHTML = '';
+  const totalPages = Math.ceil(list.length / resPerPage);
+  for(let i=1;i<=totalPages;i++){
+    const b = document.createElement('button');
+    b.textContent = i;
+    b.className = i===currentResPage ? 'pageBtn active' : 'pageBtn';
+    b.onclick = ()=>renderReservations(i);
+    pag.appendChild(b);
+  }
+}
+
+
+function editReservation(id){
+  const r=reservations.find(x=>x.id===id); if(!r) return;
+  document.getElementById('resId').value=r.id;
+  document.getElementById('resFirstName').value=r.guest_first_name||'';
+  document.getElementById('resLastName').value=r.guest_last_name||'';
+  document.getElementById('resRoomId').value=r.room_id;
+  document.getElementById('resCheckIn').value=r.check_in;
+  document.getElementById('resCheckOut').value=r.check_out;
+  showView('reservations');
+}
+
+async function saveReservation(){
+  const id=document.getElementById('resId').value;
+  const payload={
+    guest_first_name: document.getElementById('resFirstName').value.trim(),
+    guest_last_name:  document.getElementById('resLastName').value.trim(),
+    room_id: parseInt(document.getElementById('resRoomId').value,10),
+    check_in: document.getElementById('resCheckIn').value,
+    check_out: document.getElementById('resCheckOut').value
+  };
+  let r;
+  if(id){ r=await fetch(`/api/reservations/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); }
+  else { r=await fetch('/api/reservations',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); }
+  if(!r.ok){ const e=await r.json().catch(()=>({})); showToast(e.error||'Błąd zapisu'); return; }
+  showToast('Zapisano'); resetReservationForm(); loadReservations();
+}
+
+async function deleteReservation(id){
+  if(!confirm('Usunąć tę rezerwację?')) return;
+  const r=await fetch(`/api/reservations/${id}`,{method:'DELETE'});
+  if(!r.ok){ showToast('Błąd usuwania'); return; }
+  loadReservations();
+}
+
+async function checkIn(id){
+  const r=await fetch(`/api/reservations/${id}/checkin`,{method:'POST'});
+  if(!r.ok){ const e=await r.json().catch(()=>({})); showToast(e.error||'Błąd check-in'); return; }
+  showToast('Zameldowano (Check-in)');
+  await loadReservations();
+  await loadRooms(currentRoomPage);
+}
+
+async function checkOut(id){
+  const r=await fetch(`/api/reservations/${id}/checkout`,{method:'POST'});
+  if(!r.ok){ const e=await r.json().catch(()=>({})); showToast(e.error||'Błąd check-out'); return; }
+  showToast('Wymeldowano (Check-out)');
+  await loadReservations();
+  await loadRooms(currentRoomPage);
+}
+
+/* ------ users/logs/tickets (bez zmian merytorycznych) ------ */
+let currentUserId = null;
+
+/* ===== UŻYTKOWNICY ===== */
+async function loadUsers(){
+  const res = await fetch('/api/users');
+  if(!res.ok) return; // brak uprawnień
+  const users = await res.json();
+  currentUserId = currentUser.id;
+
+  const tbody = document.querySelector('#usersTable tbody');
+  tbody.innerHTML = '';
+
+  users.forEach(u=>{
+    const tr = document.createElement('tr');
+    const isMe = u.id === currentUserId;
+    tr.innerHTML = `
+      <td>${u.id}</td>
+      <td>${u.username}</td>
+      <td>${u.role}</td>
+      <td>
+        <button class="changePassBtn">Zmień hasło</button>
+        ${isMe ? '' : `<button class="deleteUserBtn">Usuń</button>`}
+      </td>
+    `;
+    tbody.appendChild(tr);
+    tr.querySelector('.changePassBtn').addEventListener('click', ()=>changePassword(u.id));
+    if(!isMe){
+      tr.querySelector('.deleteUserBtn').addEventListener('click', ()=>deleteUser(u.id));
+    }
+  });
+}
+
+const addUserBtn  = document.getElementById('addUserToggle');
+const addUserForm = document.getElementById('addUserForm');
+
+addUserBtn.addEventListener('click', () => {
+  const isHidden = addUserForm.classList.toggle('hidden'); // true jeśli po kliknięciu jest ukryty
+  addUserBtn.textContent = isHidden ? 'Pokaż formularz' : 'Ukryj formularz';
+  addUserBtn.setAttribute('aria-expanded', String(!isHidden));
 });
 
-async function deleteRoom(id){
-    if(!confirm('Na pewno usunąć pokój?')) return;
-    const res = await fetch(`/api/room/${id}`,{method:'DELETE'});
-    if(res.ok){ showToast('Pokój usunięty'); loadRooms(currentRoomPage); }
-    else showToast('Błąd przy usuwaniu pokoju.');
-}
-
-async function addRooms(){
-    const numbers = document.getElementById('roomNumbers').value.split(';').map(n=>n.trim()).filter(Boolean);
-    const type = document.getElementById('roomType').value;
-    for(let num of numbers){
-        await fetch('/api/rooms',{
-            method:'POST',
-            headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({number:num,type})
-        });
-    }
-    showToast('Dodano pokoje!');
-    document.getElementById('addRoomForm').reset();
-    loadRooms(currentRoomPage);
-}
-
-// --- Użytkownicy ---
-async function loadUsers(){
-    const res = await fetch('/api/users');
-    if(res.status===401){ window.location.href='/'; return; }
-    const users = await res.json();
-    const tbody = document.querySelector('#usersTable tbody');
-    tbody.innerHTML='';
-
-    users.forEach(user=>{
-        const tr = document.createElement('tr');
-        const isCur = user.id === currentUserId;
-        tr.innerHTML = `
-            <td>${user.id}</td>
-            <td>${user.username}</td>
-            <td>${user.role}</td>
-            <td>
-                <button class="changePassBtn">Zmień hasło</button>
-                ${isCur ? '' : `<button class="deleteUserBtn">Usuń</button>`}
-            </td>
-        `;
-        tbody.appendChild(tr);
-
-        tr.querySelector('.changePassBtn').addEventListener('click', ()=>changePassword(user.id));
-        if(!isCur){
-            tr.querySelector('.deleteUserBtn').addEventListener('click', ()=>deleteUser(user.id));
-        }
-    });
-}
-
-document.getElementById('addUserToggle').addEventListener('click', ()=>{
-    const form = document.getElementById('addUserForm');
-    form.style.display = form.style.display==='none'?'block':'none';
+document.getElementById('toggleResForm').addEventListener('click', ()=>{
+  const box = document.getElementById('resFormContainer');
+  const btn = document.getElementById('toggleResForm');
+  const show = (box.style.display === 'none' || box.style.display === '');
+  box.style.display = show ? 'block' : 'none';
+  btn.textContent = show ? 'Ukryj formularz rezerwacji' : 'Pokaż formularz rezerwacji';
 });
 
 async function addUser(){
-    const username = document.getElementById('newUsername').value;
-    const password = document.getElementById('newPassword').value;
-    const role = document.getElementById('newRole').value;
+  const username = document.getElementById('newUsername').value.trim();
+  const password = document.getElementById('newPassword').value.trim();
+  const role     = document.getElementById('newRole').value;
+  if(!username || !password){ showToast('Uzupełnij login i hasło'); return; }
 
-    const res = await fetch('/api/users',{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({username,password,role})
-    });
+  const r = await fetch('/api/users', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({username, password, role})
+  });
+  if(!r.ok){ const e=await r.json().catch(()=>({})); showToast(e.error || 'Błąd dodawania'); return; }
 
-    if(res.ok){
-        showToast('Użytkownik dodany!');
-        document.getElementById('addUserForm').reset();
-        document.getElementById('addUserForm').style.display='none';
-        loadUsers();
-    }else{
-        const err = await res.json();
-        showToast(err.error || 'Błąd dodawania użytkownika.');
-    }
+  showToast('Użytkownik dodany');
+  document.getElementById('addUserForm').reset();
+  document.getElementById('addUserForm').classList.add('hidden');
+  document.getElementById('addUserToggle').textContent = 'Pokaż formularz';
+  document.getElementById('addUserToggle').setAttribute('aria-expanded', 'false');
+  loadUsers();
 }
 
 async function changePassword(id){
-    const newPass = prompt('Nowe hasło:');
-    if(!newPass) return;
-    await fetch(`/api/user/${id}/password`,{
-        method:'PUT',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({password:newPass})
-    });
-    showToast('Hasło zmienione!');
+  const pwd = prompt('Nowe hasło:');
+  if(!pwd) return;
+  const r = await fetch(`/api/user/${id}/password`,{
+    method:'PUT', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({password: pwd})
+  });
+  if(!r.ok){ const e=await r.json().catch(()=>({})); showToast(e.error || 'Błąd zmiany hasła'); return; }
+  showToast('Hasło zmienione');
 }
 
 async function deleteUser(id){
-    if(!confirm('Na pewno usunąć użytkownika?')) return;
-    const res = await fetch(`/api/user/${id}`,{method:'DELETE'});
-    if(res.ok){ loadUsers(); showToast('Użytkownik usunięty!'); }
-    else showToast('Błąd przy usuwaniu.');
+  if(!confirm('Na pewno usunąć użytkownika?')) return;
+  const r = await fetch(`/api/user/${id}`, { method:'DELETE' });
+  if(!r.ok){ const e=await r.json().catch(()=>({})); showToast(e.error || 'Błąd usuwania'); return; }
+  showToast('Użytkownik usunięty');
+  loadUsers();
 }
 
-// --- Logi ---
-async function loadLogs(page=1){
-  const res = await fetch('/api/logs');
-  if(res.status===401){ window.location.href='/'; return; }
-  allLogs = await res.json();
-  renderLogs(page);
-}
-
+/* ===== LOGI ===== */
 function applyLogFilter(){
   logSearchTerm = document.getElementById('logSearch').value.toLowerCase();
   renderLogs(1);
+}
+
+async function loadLogs(page=1){
+  const r = await fetch('/api/logs');
+  if(!r.ok) return; // brak uprawnień
+  allLogs = await r.json();
+  renderLogs(page);
 }
 
 function renderLogs(page=1){
   currentLogPage = page;
   let filtered = allLogs;
   if(logSearchTerm){
-    filtered = allLogs.filter(l=> l.username && l.username.toLowerCase().includes(logSearchTerm));
+    filtered = allLogs.filter(l => (l.username||'').toLowerCase().includes(logSearchTerm));
   }
-  const start=(page-1)*logsPerPage;
-  const end=start+logsPerPage;
-  const logs = filtered.slice(start,end);
+
+  const start=(page-1)*logsPerPage, end=start+logsPerPage;
+  const rows = filtered.slice(start,end);
 
   const tbody = document.querySelector('#logsTable tbody');
-  tbody.innerHTML='';
-  logs.forEach(log=>{
+  tbody.innerHTML = '';
+  rows.forEach(log=>{
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${log.date}</td>
       <td>${log.time}</td>
       <td>${log.room_number}</td>
       <td>${log.username}</td>
-      <td>${log.previous.toUpperCase()}</td>
-      <td>${log.new.toUpperCase()}</td>
+      <td>${log.previous}</td>
     `;
     tbody.appendChild(tr);
   });
 
-  const pagination=document.getElementById('logsPagination');
-  pagination.innerHTML='';
-  const totalPages=Math.ceil(filtered.length/logsPerPage);
+  const pag = document.getElementById('logsPagination');
+  pag.innerHTML = '';
+  const totalPages = Math.ceil(filtered.length / logsPerPage);
   for(let i=1;i<=totalPages;i++){
-    const btn=document.createElement('button');
-    btn.textContent=i;
-    btn.className=(i===currentLogPage)?'pageBtn active':'pageBtn';
-    btn.onclick=()=>renderLogs(i);
-    pagination.appendChild(btn);
+    const b = document.createElement('button');
+    b.textContent = i;
+    b.className = i===currentLogPage ? 'pageBtn active' : 'pageBtn';
+    b.onclick = ()=>renderLogs(i);
+    pag.appendChild(b);
   }
 }
 
-// --- Priorytet pokoju ---
-async function PrioritizeRoom(id){
-    const res = await fetch(`/api/room/${id}/priority`, {method:'PUT'});
-    if(res.ok){
-        showToast("Priorytet zmieniony!");
-        loadRooms(currentRoomPage);
-    }else{
-        showToast("Błąd przy zmianie priorytetu.");
-    }
+/* ===== ZGŁOSZENIA ===== */
+function applyTicketFilter(){
+  ticketSearchTerm = document.getElementById('ticketSearch').value.toLowerCase();
+  renderTickets(1);
 }
-
-// --- Zgłoszenia ---
-const sessionUsername = "{{ session['username'] }}";
-let currentTicketPage = 1;
-const ticketsPerPage = 10;
-let allTickets = [];
-let ticketSearchTerm = "";
 
 async function loadAdminTickets(){
-    const res = await fetch('/api/tickets');
-    allTickets = await res.json();
-    renderTickets(1);
-}
-
-function applyTicketFilter(){
-    ticketSearchTerm = document.getElementById('ticketSearch').value.toLowerCase();
-    renderTickets(1);
+  const r = await fetch('/api/tickets');
+  if(!r.ok) return;
+  allTickets = await r.json();
+  renderTickets(1);
 }
 
 function renderTickets(page=1){
-    currentTicketPage = page;
+  currentTicketPage = page;
+  let filtered = allTickets;
+  if(ticketSearchTerm){
+    filtered = allTickets.filter(t =>
+      (t.username && t.username.toLowerCase().includes(ticketSearchTerm)) ||
+      (t.room_number && String(t.room_number).includes(ticketSearchTerm))
+    );
+  }
 
-    // --- filtrowanie ---
-    let filtered = allTickets;
-    if(ticketSearchTerm){
-        filtered = allTickets.filter(t => 
-            (t.username && t.username.toLowerCase().includes(ticketSearchTerm)) ||
-            (t.room_number && t.room_number.toString().includes(ticketSearchTerm))
-        );
-    }
+  const start=(page-1)*ticketsPerPage, end=start+ticketsPerPage;
+  const rows = filtered.slice(start,end);
 
-    const start = (page-1)*ticketsPerPage;
-    const end = start+ticketsPerPage;
-    const tickets = filtered.slice(start,end);
-
-    const tbody = document.querySelector('#ticketsTable tbody');
-    tbody.innerHTML = '';
-
-    tickets.forEach(t=>{
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td>${t.room_number}</td>
-            <td>${t.status}</td>
-            <td>${t.date || '-'}</td>
-            <td>${t.username}</td>
-            <td>
-                <button onclick="openChat(${t.id}, '${t.reason}')">Czat</button>
-                ${t.status !== 'closed' 
-                    ? `<button onclick="closeTicket(${t.id})" class="close-btn">Zamknij</button>` 
-                    : `<button onclick="deleteTicket(${t.id})" class="delete-btn">Usuń</button>`}
-            </td>
-        `;
-        tbody.appendChild(tr);
-    });
-
-    // --- paginacja ---
-    const pagination = document.getElementById('ticketsPagination');
-    pagination.innerHTML = '';
-    const totalPages = Math.ceil(filtered.length / ticketsPerPage);
-    for(let i=1;i<=totalPages;i++){
-        const btn = document.createElement('button');
-        btn.textContent = i;
-        btn.className = (i===currentTicketPage)?'pageBtn active':'pageBtn';
-        btn.onclick = ()=>renderTickets(i);
-        pagination.appendChild(btn);
-    }
-}
-
-
-
-// Funkcja zamykania zgłoszenia
-async function closeTicket(ticketId){
-    if(!confirm('Na pewno zamknąć zgłoszenie?')) return;
-    const res = await fetch(`/api/tickets/${ticketId}/close`, { method:'PUT' });
-    if(res.ok){
-        showToast('Zgłoszenie zamknięte!');
-        loadAdminTickets();
-    }else{
-        const err = await res.json();
-        showToast(err.error || 'Błąd przy zamykaniu zgłoszenia.');
-    }
-}
-
-// --- Chat ---
-async function openChat(ticketId, reason){
-    // Sprawdź, czy czat już istnieje
-    if (document.getElementById(`chatSection-${ticketId}`)) return;
-
-    const chatDiv = document.createElement('div');
-    chatDiv.id = `chatSection-${ticketId}`;
-    chatDiv.className = 'chat-window';
-    chatDiv.innerHTML = `
-        <div class="chat-header">
-            <strong>Zgłoszenie: ${reason}</strong>
-            <button class="close-chat" onclick="closeChat(${ticketId})">✖</button>
-        </div>
-        <div id="chatWindow-${ticketId}" class="chat-messages"></div>
-        <div class="chat-input">
-            <input type="text" id="chatMessage-${ticketId}" placeholder="Napisz wiadomość...">
-            <button onclick="sendChatMessage(${ticketId})">Wyślij</button>
-        </div>
+  const tbody = document.querySelector('#ticketsTable tbody');
+  tbody.innerHTML = '';
+  rows.forEach(t=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${t.room_number}</td>
+      <td>${t.status}</td>
+      <td>${t.created_at || '-'}</td>
+      <td>${t.username}</td>
+      <td>
+        <button onclick="openChat(${t.id}, '${(t.reason||'').replace(/'/g, "\\'")}')">Czat</button>
+        ${t.status!=='closed'
+          ? `<button onclick="closeTicket(${t.id})" class="close-btn">Zamknij</button>`
+          : `<button onclick="deleteTicket(${t.id})" class="delete-btn">Usuń</button>`}
+      </td>
     `;
+    tbody.appendChild(tr);
+  });
 
-    document.getElementById('activeChats').appendChild(chatDiv);
-    loadChat(ticketId);
+  const pag = document.getElementById('ticketsPagination');
+  pag.innerHTML = '';
+  const totalPages = Math.ceil(filtered.length / ticketsPerPage);
+  for(let i=1;i<=totalPages;i++){
+    const b = document.createElement('button');
+    b.textContent = i;
+    b.className = i===currentTicketPage ? 'pageBtn active' : 'pageBtn';
+    b.onclick = ()=>renderTickets(i);
+    pag.appendChild(b);
+  }
 }
 
+/* Czat w zgłoszeniach */
+const sessionUsername = "{{ session.get('username','') }}";
 
-function closeChat(ticketId) {
-    const chatDiv = document.getElementById(`chatSection-${ticketId}`);
-    if (chatDiv) chatDiv.remove();
+function closeChat(ticketId){
+  const el = document.getElementById(`chatSection-${ticketId}`);
+  if(el) el.remove();
+}
+
+async function openChat(ticketId, reason){
+  if(document.getElementById(`chatSection-${ticketId}`)) return;
+
+  const chat = document.createElement('div');
+  chat.id = `chatSection-${ticketId}`;
+  chat.className = 'chat-window';
+  chat.innerHTML = `
+    <div class="chat-header">
+      <strong>Zgłoszenie: ${reason}</strong>
+      <button class="close-chat" onclick="closeChat(${ticketId})">✖</button>
+    </div>
+    <div id="chatWindow-${ticketId}" class="chat-messages"></div>
+    <div class="chat-input">
+      <input type="text" id="chatMessage-${ticketId}" placeholder="Napisz wiadomość...">
+      <button onclick="sendChatMessage(${ticketId})">Wyślij</button>
+    </div>
+  `;
+  document.getElementById('activeChats').appendChild(chat);
+  loadChat(ticketId);
 }
 
 async function loadChat(ticketId){
-    const res = await fetch(`/api/tickets/${ticketId}/messages`);
-    const messages = await res.json();
-    const chatWin = document.getElementById(`chatWindow-${ticketId}`);
-    chatWin.innerHTML = '';
-
-    messages.forEach(m=>{
-        const isAdmin = m.sender === sessionUsername;
-        const msgDiv = document.createElement('div');
-        msgDiv.className = 'message ' + (isAdmin ? 'sent':'received');
-        msgDiv.innerHTML = `<strong>${m.sender}:</strong> ${m.message}`;
-        chatWin.appendChild(msgDiv);
-    });
-
-    chatWin.scrollTop = chatWin.scrollHeight;
+  const r = await fetch(`/api/tickets/${ticketId}/messages`);
+  const msgs = await r.json();
+  const win = document.getElementById(`chatWindow-${ticketId}`);
+  win.innerHTML = '';
+  msgs.forEach(m=>{
+    const isMe = m.sender === (currentUser.username || sessionUsername);
+    const div = document.createElement('div');
+    div.className = 'message ' + (isMe ? 'sent' : 'received');
+    div.innerHTML = `<strong>${m.sender}:</strong> ${m.message}`;
+    win.appendChild(div);
+  });
+  win.scrollTop = win.scrollHeight;
 }
 
 async function sendChatMessage(ticketId){
-    const msgInput = document.getElementById(`chatMessage-${ticketId}`);
-    const message = msgInput.value.trim();
-    if(!message) return;
+  const inp = document.getElementById(`chatMessage-${ticketId}`);
+  const message = (inp.value||'').trim();
+  if(!message) return;
+  await fetch(`/api/tickets/${ticketId}/messages`,{
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({message})
+  });
+  inp.value = '';
+  loadChat(ticketId);
+}
 
-    await fetch(`/api/tickets/${ticketId}/messages`,{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({message})
-    });
-    msgInput.value='';
-    loadChat(ticketId);
+async function closeTicket(ticketId){
+  if(!confirm('Zamknąć zgłoszenie?')) return;
+  const r = await fetch(`/api/tickets/${ticketId}/close`, { method:'PUT' });
+  if(!r.ok){ const e=await r.json().catch(()=>({})); showToast(e.error || 'Błąd zamykania'); return; }
+  loadAdminTickets();
+  showToast('Zgłoszenie zamknięte');
 }
 
 async function deleteTicket(ticketId){
-    if(!confirm('Na pewno usunąć to zamknięte zgłoszenie?')) return;
-    const res = await fetch(`/api/tickets/${ticketId}`, { method:'DELETE' });
-    if(res.ok){
-        showToast('Zgłoszenie usunięte!');
-        loadAdminTickets();
-    }else{
-        const err = await res.json();
-        showToast(err.error || 'Błąd przy usuwaniu zgłoszenia.');
-    }
+  if(!confirm('Usunąć zgłoszenie?')) return;
+  const r = await fetch(`/api/tickets/${ticketId}`, { method:'DELETE' });
+  if(!r.ok){ const e=await r.json().catch(()=>({})); showToast(e.error || 'Błąd usuwania'); return; }
+  loadAdminTickets();
+  showToast('Zgłoszenie usunięte');
 }
 
-// --- Inicjalizacja ---
-loadAdminTickets();
-showView('rooms');
-loadRooms();
-loadUsers();
-loadLogs();
+/* ===== INIT ===== */
+(async function init(){
+  await loadMe();
+  showView('rooms');
+  loadRooms();
+  loadReservations();
+  loadAdminTickets(); // recepcjonista też może oglądać wszystkie zgłoszenia
+
+  // TYLKO dla admin/manager:
+  if(['admin','manager'].includes(currentUser.role)){
+    loadUsers();
+    loadLogs();
+  }
+})();
 </script>
 </body>
 </html>

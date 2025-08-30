@@ -130,7 +130,7 @@ body {
     cursor: pointer;
     display: none;
 }
-.room-card .priority-btn { right: 42px; background: #e67e22; }
+.room-card .priority-btn { right: 42px; background: #0d77e1; }
 .room-card.editable .delete-btn,
 .room-card.editable .priority-btn { display: block; }
 
@@ -344,9 +344,9 @@ button.delete-btn:hover { background: #8e44ad; }
 
 /* --- Edit toggle button (dolny prawy róg) --- */
 #editToggle {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
+      position: fixed;      /* przyklejony do okna, nie do dokumentu */
+  right: 16px;          /* róg */
+  bottom: 16px;         /* róg (zmień na top:16px; jeśli wolisz górny) */ 
     width: 60px;
     height: 60px;
     border-radius: 50%;
@@ -356,6 +356,64 @@ button.delete-btn:hover { background: #8e44ad; }
     border: none;
     cursor: pointer;
     box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}
+/* Wyszukiwarka rezerwacji jak w logach */
+#resGuestFilter {
+  width: 100%;
+  padding: 9px 12px;
+  margin: 10px 0 6px 0;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+  background: #fff;
+}
+
+/* Siatka formularza rezerwacji i centrowanie pola "Pokój" */
+#reservationForm .form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+#reservationForm .full-row { grid-column: 1 / -1; }
+#reservationForm .centered {
+  grid-column: 1 / -1;
+  justify-self: center;
+  width: 260px;   /* kontrolowana szerokość selecta */
+  max-width: 100%;
+}
+#reservationForm .centered select { width: 100%; }
+
+/* Badge nad przyciskiem toggle */
+.btn-with-badge {
+  position: fixed;      /* BYŁO: relative */
+  right: 20px;
+  bottom: 20px;
+  display: inline-block;
+  z-index: 1000;
+}
+.badge-dot {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  z-index: 1001;        /* nad przyciskiem */
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9999px;
+  background: #e74c3c;
+  color: #fff;
+  font-weight: 700;
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+  box-shadow: 0 0 0 2px #fff;
+}
+.badge-dot.hidden { display: none; }
+
+.comment-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(22,160,133,.25);
 }
 
 /* --- Toast --- */
