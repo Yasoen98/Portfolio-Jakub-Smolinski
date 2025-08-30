@@ -1,0 +1,5 @@
+*.txt
+/hotel_menager/flask_session
+/hotel_menager/flask_session
+hotel_menager/hotel.db
+/hotel_menager/flask_session
