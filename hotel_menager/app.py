@@ -311,19 +311,147 @@ def get_logs():
 def get_reservations():
     if 'user_id' not in session:
         return jsonify({'error': 'Unauthorized'}), 401
-    
+
     user_id = session['user_id']
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT r.id, rooms.number, rooms.type, r.check_in, r.check_out 
-        FROM reservations r 
-        JOIN rooms ON r.room_id = rooms.id 
+        SELECT r.id, r.room_id, rooms.number, rooms.type, r.check_in, r.check_out
+        FROM reservations r
+        JOIN rooms ON r.room_id = rooms.id
         WHERE r.user_id = ?
     """, (user_id,))
     reservations = cursor.fetchall()
     conn.close()
-    return jsonify([{'id': res[0], 'room_number': res[1], 'type': res[2], 'check_in': res[3], 'check_out': res[4]} for res in reservations])
+    return jsonify([
+        {
+            'id': res[0],
+            'room_id': res[1],
+            'room_number': res[2],
+            'type': res[3],
+            'check_in': res[4],
+            'check_out': res[5]
+        }
+        for res in reservations
+    ])
+
+
+# API do tworzenia rezerwacji
+@app.route('/api/reservations', methods=['POST'])
+def create_reservation():
+    if 'user_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    data = request.json
+    room_id = data.get('room_id')
+    check_in = data.get('check_in')
+    check_out = data.get('check_out')
+    user_id = session['user_id']
+    if session.get('role') == 'admin':
+        user_id = data.get('user_id', user_id)
+
+    if not room_id or not check_in or not check_out:
+        return jsonify({'error': 'Missing fields'}), 400
+
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT id FROM rooms WHERE id = ?", (room_id,))
+    if not cursor.fetchone():
+        conn.close()
+        return jsonify({'error': 'Room not found'}), 404
+
+    cursor.execute(
+        """
+        SELECT COUNT(*) FROM reservations
+        WHERE room_id = ? AND NOT (? >= check_out OR ? <= check_in)
+        """,
+        (room_id, check_in, check_out)
+    )
+    (count,) = cursor.fetchone()
+    if count > 0:
+        conn.close()
+        return jsonify({'error': 'Room already booked for given dates'}), 400
+
+    cursor.execute(
+        "INSERT INTO reservations (user_id, room_id, check_in, check_out) VALUES (?,?,?,?)",
+        (user_id, room_id, check_in, check_out)
+    )
+    res_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    log_action(user_id, 'create_reservation', room_id, f"{check_in} - {check_out}")
+    return jsonify({'success': True, 'id': res_id})
+
+
+# API do aktualizacji rezerwacji
+@app.route('/api/reservations/<int:res_id>', methods=['PUT'])
+def update_reservation(res_id):
+    if 'user_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    data = request.json
+    check_in = data.get('check_in')
+    check_out = data.get('check_out')
+    if not check_in or not check_out:
+        return jsonify({'error': 'Missing fields'}), 400
+
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT user_id, room_id FROM reservations WHERE id = ?", (res_id,))
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return jsonify({'error': 'Reservation not found'}), 404
+    owner_id, room_id = row
+    if session['user_id'] != owner_id and session.get('role') != 'admin':
+        conn.close()
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    cursor.execute(
+        """
+        SELECT COUNT(*) FROM reservations
+        WHERE room_id = ? AND id != ? AND NOT (? >= check_out OR ? <= check_in)
+        """,
+        (room_id, res_id, check_in, check_out)
+    )
+    (count,) = cursor.fetchone()
+    if count > 0:
+        conn.close()
+        return jsonify({'error': 'Room already booked for given dates'}), 400
+
+    cursor.execute(
+        "UPDATE reservations SET check_in = ?, check_out = ? WHERE id = ?",
+        (check_in, check_out, res_id)
+    )
+    conn.commit()
+    conn.close()
+    log_action(session['user_id'], 'update_reservation', room_id, f"{check_in} - {check_out}")
+    return jsonify({'success': True})
+
+
+# API do usuwania rezerwacji
+@app.route('/api/reservations/<int:res_id>', methods=['DELETE'])
+def delete_reservation(res_id):
+    if 'user_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT user_id, room_id FROM reservations WHERE id = ?", (res_id,))
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return jsonify({'error': 'Reservation not found'}), 404
+    owner_id, room_id = row
+    if session['user_id'] != owner_id and session.get('role') != 'admin':
+        conn.close()
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    cursor.execute("DELETE FROM reservations WHERE id = ?", (res_id,))
+    conn.commit()
+    conn.close()
+    log_action(session['user_id'], 'delete_reservation', room_id, f"Reservation {res_id} cancelled")
+    return jsonify({'success': True})
 
 # API do pobierania użytkowników (tylko admin)
 @app.route('/api/users', methods=['GET'])

@@ -12,6 +12,7 @@
         <div class="sidebar">
             <div class="top-section menu-buttons">
                 <button onclick="showSection('rooms')" class="active">Lista Pokoi</button>
+                <button onclick="showSection('reservations')">Rezerwacje</button>
                 <button onclick="showSection('tickets')">Zgłoszenia</button>
             </div>
             <div class="bottom-section">
@@ -26,6 +27,30 @@
                 <h2>Lista Pokoi</h2>
                 <div id="roomsGrid" class="room-grid"></div>
                 <div id="roomsPagination" class="pagination"></div>
+            </div>
+
+            <!-- Rezerwacje -->
+            <div id="reservations" class="section" style="display:none;">
+                <h2>Rezerwacje</h2>
+                <button id="toggleReservationForm" style="margin-bottom: 25px;">Pokaż formularz rezerwacji</button>
+                <div id="reservationFormContainer" style="display:none;">
+                    <form id="reservationForm">
+                        <input type="hidden" id="reservationId">
+                        <label>Pokój:</label>
+                        <select id="reservationRoom"></select>
+                        <label>Check-in:</label>
+                        <input type="date" id="reservationCheckIn">
+                        <label>Check-out:</label>
+                        <input type="date" id="reservationCheckOut">
+                        <button type="button" onclick="submitReservation()">Zapisz</button>
+                    </form>
+                </div>
+                <table id="reservationsTable">
+                    <thead>
+                        <tr><th>Pokój</th><th>Od</th><th>Do</th><th>Akcje</th></tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
             </div>
 
         <!-- Zgłoszenia -->
@@ -75,6 +100,7 @@ let allRooms = [];
 let editMode = false;
 let currentTicketId = null;
 let currentUsername = null;
+let reservations = [];
 
 async function loadCurrentUser(){
     const res = await fetch('/api/me');
@@ -90,6 +116,9 @@ function showSection(sectionId){
     document.getElementById(sectionId).style.display='block';
     document.querySelectorAll('.menu-buttons button').forEach(b=>b.classList.remove('active'));
     event.target.classList.add('active');
+    if(sectionId==='reservations') loadReservations();
+    if(sectionId==='tickets') loadTickets();
+    if(sectionId==='rooms') loadRooms();
 }
 
 function showToast(msg){
@@ -180,6 +209,105 @@ function updateEditCounter(){
     counter.textContent = count;
     counter.style.background = count>0 ? '#e67e22' : '#27ae60';
 }
+
+// Rezerwacje
+async function loadReservations(){
+    const res = await fetch('/api/reservations');
+    if(res.status===401){ window.location.href='/'; return; }
+    reservations = await res.json();
+    renderReservations();
+}
+
+function renderReservations(){
+    const tbody = document.querySelector('#reservationsTable tbody');
+    if(!tbody) return;
+    tbody.innerHTML='';
+    reservations.forEach(r=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${r.room_number}</td><td>${r.check_in}</td><td>${r.check_out}</td>`+
+                       `<td><button onclick="editReservation(${r.id})">Edytuj</button> <button onclick="deleteReservation(${r.id})">Usuń</button></td>`;
+        tbody.appendChild(tr);
+    });
+}
+
+async function loadRoomsForReservation(){
+    const res = await fetch('/api/rooms');
+    const rooms = await res.json();
+    const sel = document.getElementById('reservationRoom');
+    sel.innerHTML='';
+    rooms.filter(r=>r.status!=='occupied').forEach(r=>{
+        const opt = document.createElement('option');
+        opt.value = r.id;
+        opt.textContent = r.number;
+        sel.appendChild(opt);
+    });
+}
+
+document.getElementById('toggleReservationForm').addEventListener('click', ()=>{
+    const container = document.getElementById('reservationFormContainer');
+    if(container.style.display==='none'){
+        container.style.display='block';
+        document.getElementById('toggleReservationForm').textContent='Ukryj formularz rezerwacji';
+        loadRoomsForReservation();
+    } else {
+        container.style.display='none';
+        document.getElementById('toggleReservationForm').textContent='Pokaż formularz rezerwacji';
+        clearReservationForm();
+    }
+});
+
+function clearReservationForm(){
+    document.getElementById('reservationId').value='';
+    document.getElementById('reservationForm').reset();
+}
+
+async function submitReservation(){
+    const id = document.getElementById('reservationId').value;
+    const room_id = document.getElementById('reservationRoom').value;
+    const check_in = document.getElementById('reservationCheckIn').value;
+    const check_out = document.getElementById('reservationCheckOut').value;
+    const method = id ? 'PUT' : 'POST';
+    const url = id ? `/api/reservations/${id}` : '/api/reservations';
+    const res = await fetch(url,{
+        method,
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({room_id, check_in, check_out})
+    });
+    const data = await res.json();
+    if(res.ok){
+        showToast('Zapisano rezerwację!');
+        loadReservations();
+        clearReservationForm();
+        document.getElementById('reservationFormContainer').style.display='none';
+        document.getElementById('toggleReservationForm').textContent='Pokaż formularz rezerwacji';
+    } else {
+        showToast(data.error || 'Błąd!');
+    }
+}
+
+function editReservation(id){
+    const r = reservations.find(x=>x.id===id);
+    if(!r) return;
+    document.getElementById('reservationId').value = r.id;
+    document.getElementById('reservationCheckIn').value = r.check_in;
+    document.getElementById('reservationCheckOut').value = r.check_out;
+    document.getElementById('reservationFormContainer').style.display='block';
+    document.getElementById('toggleReservationForm').textContent='Ukryj formularz rezerwacji';
+    loadRoomsForReservation().then(()=>{ document.getElementById('reservationRoom').value = r.room_id; });
+}
+
+async function deleteReservation(id){
+    if(!confirm('Usunąć rezerwację?')) return;
+    const res = await fetch(`/api/reservations/${id}`, {method:'DELETE'});
+    const data = await res.json();
+    if(res.ok){
+        showToast('Usunięto rezerwację!');
+        loadReservations();
+    } else {
+        showToast(data.error || 'Błąd!');
+    }
+}
+
 // Rozwijanie formularza zgłoszenia
 document.getElementById('toggleTicketForm').addEventListener('click', () => {
     const container = document.getElementById('ticketFormContainer');
@@ -279,9 +407,11 @@ async function sendChatMessage(){
 setInterval(()=>{ if(currentTicketId) loadChat(); },2000);
 
 // Inicjalizacja
+loadCurrentUser();
 loadRooms();
 loadRoomsForTicket();
 loadTickets();
+loadReservations();
 </script>
 </body>
 </html>
