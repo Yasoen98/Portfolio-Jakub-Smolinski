@@ -1,0 +1,19 @@
+{
+  "name": "voxbook-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@8.15.7",
+  "scripts": {
+    "dev": "pnpm --filter web dev",
+    "build": "pnpm --filter web build",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "worker": "pnpm --filter worker start",
+    "db:push": "pnpm --filter db prisma db push",
+    "db:seed": "pnpm --filter db prisma db seed"
+  },
+  "devDependencies": {
+    "eslint": "^8.56.0",
+    "prettier": "^3.2.5"
+  }
+}
