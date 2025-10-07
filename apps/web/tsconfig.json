@@ -1,0 +1,27 @@
+{
+  "extends": "@tsconfig/next/tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/components/*": ["./components/*"],
+      "@/lib/*": ["./lib/*"],
+      "@/app/*": ["./app/*"],
+      "@core/*": ["../packages/core/*"],
+      "@db": ["../packages/db/src"],
+      "@queue": ["./lib/queue"],
+      "@tts": ["../packages/core/audio"],
+      "@pdf": ["../packages/core/pdf"],
+      "@player": ["../packages/core/player"]
+    },
+    "types": ["node", "jest", "vitest"],
+    "module": "esnext"
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    "**/*.cjs",
+    "**/*.mjs"
+  ],
+  "exclude": ["node_modules"]
+}

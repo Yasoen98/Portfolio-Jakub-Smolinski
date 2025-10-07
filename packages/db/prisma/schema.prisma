@@ -1,0 +1,87 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  passwordHash  String
+  createdAt     DateTime @default(now())
+  VoiceModel    VoiceModel[]
+  Document      Document[]
+  PlaybackState PlaybackState?
+  consentVoice  Boolean  @default(false)
+  consentText   Boolean  @default(false)
+}
+
+model VoiceModel {
+  id          String       @id @default(cuid())
+  userId      String
+  status      String
+  engine      String
+  version     Int          @default(1)
+  metricsJson Json?
+  samples     VoiceSample[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  User        User         @relation(fields: [userId], references: [id])
+}
+
+model VoiceSample {
+  id           String   @id @default(cuid())
+  voiceModelId String
+  url          String
+  durationSec  Int
+  sampleRate   Int
+  createdAt    DateTime @default(now())
+  VoiceModel   VoiceModel @relation(fields: [voiceModelId], references: [id])
+}
+
+model Document {
+  id           String          @id @default(cuid())
+  userId       String
+  title        String
+  author       String?
+  pages        Int?
+  bytes        Int
+  storageUrl   String
+  createdAt    DateTime        @default(now())
+  User         User            @relation(fields: [userId], references: [id])
+  chunks       DocumentChunk[]
+}
+
+model DocumentChunk {
+  id          String   @id @default(cuid())
+  documentId  String
+  page        Int
+  order       Int
+  text        String
+  charStart   Int
+  charEnd     Int
+  Document    Document @relation(fields: [documentId], references: [id])
+
+  @@index([documentId, order])
+}
+
+model PlaybackState {
+  userId     String   @id
+  documentId String
+  chunkOrder Int
+  offsetMs   Int
+  speed      Float    @default(1.0)
+  updatedAt  DateTime @updatedAt
+  User       User     @relation(fields: [userId], references: [id])
+}
+
+model TrainingJob {
+  id        String   @id @default(cuid())
+  modelId   String
+  status    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
