@@ -1,5 +1,12 @@
-*.txt
-/hotel_menager/flask_session
-/hotel_menager/flask_session
-hotel_menager/hotel.db
-/hotel_menager/flask_session
+node_modules
+.pnpm-store
+.env
+apps/web/.env
+apps/web/.next
+apps/web/out
+packages/db/node_modules
+apps/web/node_modules
+apps/worker/node_modules
+coverage
+dist
+.DS_Store
