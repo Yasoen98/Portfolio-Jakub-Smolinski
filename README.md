@@ -38,7 +38,11 @@ VoxBook to monorepo (pnpm workspaces) zbudowany wokół personalizowanego lektor
 
 3. **Skonfiguruj bazę i dane demo**
 
+   Najpierw w katalogu głównym utwórz plik `.env` z danymi połączenia do usług (Prisma korzysta z niego podczas migracji),
+   a następnie skopiuj konfigurację także dla aplikacji webowej:
+
    ```bash
+   cp .env.example .env
    cd apps/web
    cp .env.example .env
    cd ../..
@@ -79,6 +83,7 @@ Jeżeli dopiero zaczynasz pracę z projektami JavaScript i Dockerem, wykonaj pon
    - Wpisz po kolei:
 
      ```bash
+     cp .env.example .env
      cd apps/web
      cp .env.example .env
      cd ../..
@@ -87,6 +92,8 @@ Jeżeli dopiero zaczynasz pracę z projektami JavaScript i Dockerem, wykonaj pon
      ```
 
    - Komendy `db:push` i `db:seed` tworzą strukturę bazy danych oraz dodają konto testowe. Poczekaj, aż każda zakończy się komunikatem „Done”.
+   - Jeśli zobaczysz błąd `Environment variable not found: DATABASE_URL`, upewnij się, że w katalogu głównym istnieje plik `.env`
+     skopiowany z `.env.example` i zawiera prawidłowy adres bazy danych.
 
 6. **Uruchom aplikację**
    - Otwórz **nowe** okno terminala lub kartę w VS Code (pierwsze okno zostaw w spokoju).
